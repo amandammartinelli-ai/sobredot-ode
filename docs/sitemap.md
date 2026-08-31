@@ -1,4 +1,4 @@
-# Mapa de páginas — estado após Etapa 3
+# Mapa de páginas — estado após Etapa 4
 
 | Rota | Vista | Acesso | Chrome | Descrição |
 |---|---|---|---|---|
@@ -14,9 +14,12 @@
 | `#/timeline` | `timelineView` | autenticado + família | sim | Linha do tempo com filtros (categoria, fonte), edição, eliminação lógica, histórico |
 | `#/documents` | `documentsView` | autenticado + família | sim | Lista/filtros de documentos, upload, "Perguntar aos documentos" |
 | `#/documento/:childId/:documentId` | `documentDetailView` | autenticado + família | sim | Metadados, revisão da extração, versões, aprovação/rejeição, eliminação |
-| `#/insights` | `insightsView` | autenticado + família | sim | Aviso de que o painel de cruzamentos ainda não existe; atalho para "Perguntar aos documentos" |
-| `#/reports` | `reportsView` | autenticado + família | sim | Estado vazio (Etapa 4) |
-| `#/family` | `familyView` | autenticado + família | sim | Membros, convites, concessões de acesso por criança, consentimentos, auditoria |
+| `#/insights` | `insightsView` | autenticado + família | sim | Visão Integrada: resumo, padrões/cruzamentos, estratégias, pontos para conversa, perguntas para a próxima consulta, metas |
+| `#/reports` | `reportsView` | autenticado + família | sim | Construir relatório (módulos/documentos/período), pré-visualização sensível, impressão, links de partilha |
+| `#/relatorio-partilhado/:childId/:shareId/:token` | `sharedReportView` | público (token verificado no servidor) | não | Vista só de leitura de um relatório partilhado, sem sessão |
+| `#/biblioteca-ode` | `odeLibraryView` | autenticado + família | sim | Recursos educativos opcionais da ODE, separados da análise da criança |
+| `#/colaborador/:childId` (e `/:grantId` na primeira vez) | `collaboratorView` | autenticado (sem família) | não | Área do colaborador externo: aceitar concessão; ver/validar/contestar insights dentro do âmbito concedido |
+| `#/family` | `familyView` | autenticado + família | sim | Membros, convites, concessões de acesso por criança (agora com âmbitos `insights`/`goals`), consentimentos, auditoria |
 | `#/profile` | `profileView` | autenticado + família | sim | Conta, verificação de e-mail, acessibilidade, privacidade, atalho para Família |
 | qualquer outra | `notFoundView` | público | não | 404 interno |
 
@@ -60,6 +63,44 @@ selected → uploading → quarantine → verifying → extracting → pending_r
    │                                                    item a item)
    ▼                                                              ▼
  (erro/rejeitado)                                    approved ──► visão integrada
+```
+
+## Fluxo da Inteligência Integrada (detalhe)
+
+```
+Visão Integrada → "Atualizar leitura de padrões" (só família)
+   │
+   ▼
+generateInsights (servidor): métricas + padrões + narrativa grounded
+   │
+   ▼
+children/{childId}/insights (persistidos, status "não revisto")
+   │
+   ├── família: "Continuar a observar" / "Revisto pela família"
+   │
+   └── profissional convidado (âmbito "insights" + capacidade "validate")
+           │ (#/colaborador/{childId})
+           ▼
+       "Validado por profissional" ou "Contestado" (+ comentário,
+        histórico imutável — nunca edita o registo original)
+```
+
+## Fluxo de relatórios e partilha (detalhe)
+
+```
+Relatórios → escolher período + módulos + documentos aprovados
+   │
+   ▼
+Pré-visualização (com aviso de informação sensível)
+   │
+   ├── Imprimir / Guardar como PDF (HTML imprimível do browser)
+   │
+   └── Criar link de partilha temporário
+           │ (conteúdo recalculado e CONGELADO no servidor)
+           ▼
+      #/relatorio-partilhado/{childId}/{shareId}/{token} (sem sessão)
+           │
+           └── revogável a qualquer momento pela família; expira sozinho
 ```
 
 ## Fluxo de concessão de acesso (detalhe)

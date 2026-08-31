@@ -191,3 +191,68 @@ tem uma propriedade de segurança importante — nunca produz uma
 categoria sem correspondência real no texto (nunca "inventa"). Fica
 documentado como um ponto de substituição futuro por um classificador
 mais rico, mantendo a mesma interface (`extractStructuredItemsFromPages`).
+
+## 18. Relatório partilhado: conteúdo recalculado e congelado no servidor, nunca lido diretamente do Firestore
+
+**Decisão:** `createReportShareLink` nunca aceita um "payload" pronto do
+cliente — recalcula o relatório inteiro no servidor a partir dos
+parâmetros (período, módulos, documentos) e guarda o resultado
+(`reportSnapshot`) congelado no documento de partilha. O acesso público
+ao link nunca lê o Firestore diretamente; passa sempre por
+`getSharedReport`, que verifica um token opaco (hash SHA-256, comparado
+de forma "timing-safe") contra o que está guardado.
+**Motivo:** o mesmo raciocínio da decisão 14 (Storage): mais fácil de
+auditar (todo o acesso passa por uma função específica) e estritamente
+mais seguro. Congelar o conteúdo no momento da criação também torna o
+comportamento determinístico para os testes de "escopo parcial" e
+"link expirado" — o conteúdo partilhado não muda se os dados originais
+mudarem depois, o que é também mais previsível para quem recebe o link.
+**Custo aceite:** quem recebe um link de partilha vê sempre um retrato
+do momento da partilha, nunca dados atualizados — aceitável para um
+relatório pontual "pronto a enviar", documentado na interface.
+
+## 19. Guardas de linguagem da narrativa como testes, não como confiança cega no template
+
+**Decisão:** `assertNoCausalLanguage` e `assertNumbersAreGrounded`
+(`functions/src/insights.js`) correm sobre o texto de **todo** insight
+gerado, mesmo vindo de templates escritos e revistos manualmente, antes
+de ser persistido.
+**Motivo:** escrever "com cuidado" um template não é, por si só, uma
+garantia verificável — um editor futuro pode introduzir uma frase causal
+ou um número solto sem se aperceber. Tornar isto uma verificação
+executável (em vez de só uma convenção documentada) significa que uma
+regressão faz o insight ser bloqueado (nunca publicado com o defeito) e,
+nos testes, faz o teste falhar de forma imediata e clara. Foi isto que
+aconteceu durante o próprio desenvolvimento desta etapa: um número
+correto mas não citado na evidência (`totalDays` no resumo do período)
+foi apanhado por `assertNumbersAreGrounded` antes de chegar a qualquer
+utilizador — o código foi corrigido, não a verificação.
+
+## 20. Validação profissional reutiliza as concessões de acesso da Etapa 2, sem um segundo mecanismo de convite
+
+**Decisão:** um "profissional revisor" que pode validar insights é
+exatamente o mesmo mecanismo de `accessGrants`/`accessIndex` já existente
+— só com a capacidade `'validate'` e o pseudo-âmbito `'insights'`
+(novos nesta etapa) explicitamente concedidos.
+**Motivo:** evita duplicar toda a lógica de validade/expiração/revogação
+que já existe e já está testada; um segundo mecanismo de convite
+paralelo seria mais superfície de ataque e mais uma fonte de
+divergência entre "quem tem acesso a quê". `resolveChildAccess` e as
+regras do Firestore continuam a ser a única fonte de verdade.
+
+## 21. `[hidden] { display: none !important }` global
+
+**Decisão:** `src/styles/base.css` força `display:none` em qualquer
+elemento com o atributo `hidden`, independentemente de outras regras.
+**Motivo:** descoberto durante o teste manual desta etapa —
+`setChromeVisible` (router) alterna `nav.hidden`/`header.hidden` para
+esconder a barra de navegação em rotas públicas (ex.: o novo
+`#/relatorio-partilhado`, `#/colaborador`). Isso nunca tinha falhado
+visivelmente até agora porque todas as rotas anteriores sem "chrome"
+eram sempre a PRIMEIRA vista carregada (login, welcome) — nunca se
+navegava para lá a partir de uma vista com a barra já desenhada e
+visível na mesma sessão. `.app-nav { display: flex }` (uma regra de
+classe) tem mais especificidade do que o estilo por omissão do agente de
+utilizador para `[hidden]`, pelo que `nav.hidden = true` não tinha
+qualquer efeito visual nesse cenário — reproduzido e corrigido durante o
+teste manual desta etapa, confirmado por captura de ecrã antes/depois.

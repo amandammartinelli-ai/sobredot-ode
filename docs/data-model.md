@@ -1,4 +1,4 @@
-# Modelo de dados — Etapas 2 e 3
+# Modelo de dados — Etapas 2, 3 e 4
 
 Este documento descreve a forma de cada coleção do Firestore, quem a
 escreve e por que caminho. É a referência de verdade para
@@ -43,6 +43,10 @@ children/{childId}
     versions/{versionId}
     extractionItems/{itemId}
   aiQueries/{queryId}
+  insights/{insightId}
+    statusHistory/{entryId}
+  goals/{goalId}
+  reportShares/{shareId}
 auditLog/{eventId}
 ```
 
@@ -321,6 +325,67 @@ metadados técnicos, nunca o texto da pergunta/resposta/documento (ver
 | `sourceDocumentIds` | array de IDs |
 | `durationMs` | number |
 | `createdAt` | Timestamp |
+
+### `children/{childId}/insights/{insightId}` (Etapa 4 — Inteligência Integrada)
+
+Ver `docs/insights.md` para as fórmulas e o modelo completo. Escrito
+**só** por Cloud Functions (`generateInsights`, `setInsightStatus`) —
+nunca diretamente pelo cliente.
+
+| Campo | Tipo |
+|---|---|
+| `childId`, `familyId` | string |
+| `patternType` | `'category_summary' \| 'sleep_intensity' \| 'environment_dysregulation' \| 'food_wellbeing' \| 'medication_effects' \| 'school_emotions' \| 'strategies_outcomes' \| 'document_recommendations' \| 'evolution'` |
+| `title`, `factualObservation`, `possiblePattern` | string \| null |
+| `evidence` | array de `{metricKey, label, value, documentId?, page?, excerpt?}` — todo número citado no texto tem de aparecer aqui |
+| `comparisonDetails` | só em `patternType: 'evolution'` — `{remained, appeared, disappeared}` |
+| `period` | `{key, startAt, endAt}` |
+| `sources` | array de `'family' \| 'school' \| 'professional' \| 'other'` |
+| `sampleSize`, `daysWithRecords`, `daysWithoutRecords` | number |
+| `confidence` | `'insufficient' \| 'low' \| 'medium' \| 'high'` |
+| `limitations`, `safeActions` | array de string / `{id, label}` |
+| `generatedAt`, `generatedBy`, `methodVersion` | Timestamp, uid, string |
+| `status` | `'not_reviewed' \| 'family_reviewed' \| 'professional_validated' \| 'contested'` |
+| `deletedAt` | Timestamp \| null |
+
+#### `.../insights/{insightId}/statusHistory/{entryId}`
+
+Imutável, só criação (por `setInsightStatus`). `status`, `actorUid`,
+`actorRole` (`'family' | 'professional'`), `comment`, `createdAt`.
+
+### `children/{childId}/goals/{goalId}` (Etapa 4)
+
+Meta acompanhável, sempre uma declaração da família (mesmo quando
+"importada" de um documento — a importação só copia texto para um campo
+próprio da família, nunca converte uma recomendação em obrigação). O
+cliente escreve diretamente (como `consents`/`tags`).
+
+| Campo | Tipo |
+|---|---|
+| `childId`, `familyId`, `title` | string |
+| `description` | string \| null |
+| `origin` | `'family' \| 'document'` |
+| `sourceDocumentId`, `sourceExtractionItemId` | string \| null |
+| `targetDate` | string ISO \| null |
+| `status` | `'active' \| 'achieved' \| 'paused' \| 'discontinued'` |
+| `createdBy`, `updatedBy` | uid |
+| `createdAt`, `updatedAt`, `deletedAt` | Timestamp |
+
+### `children/{childId}/reportShares/{shareId}` (Etapa 4)
+
+Ligação de partilha temporária de um relatório. Escrito só por Cloud
+Functions (`createReportShareLink`, `revokeReportShareLink`,
+`getSharedReport`). Ver `docs/insights.md`, "Fluxo de relatórios e
+partilha".
+
+| Campo | Tipo |
+|---|---|
+| `childId`, `familyId`, `createdBy` | — |
+| `tokenHash` | string (SHA-256 hex do token opaco — o token em si nunca é guardado) |
+| `scope` | `{modules, documentIds, periodKey}` |
+| `reportSnapshot` | map — o conteúdo do relatório **congelado** no momento da criação |
+| `expiresAt`, `revokedAt`, `revokedBy` | Timestamp \| null |
+| `accessCount`, `lastAccessedAt` | number, Timestamp \| null |
 
 ## `auditLog/{eventId}`
 

@@ -6,20 +6,25 @@ Uma visão integrada e longitudinal da criança: registos de família, escola
 e profissionais em emoções, comportamentos, sono, alimentação, medicação,
 escola, comunicação, sensorialidade, conquistas e observações.
 
-> ⚠️ **Etapa 3 de 5.** Autenticação, famílias, permissões e registos
+> ⚠️ **Etapa 4 de 5.** Autenticação, famílias, permissões e registos
 > quotidianos são reais e testados (Etapa 2). O cofre de documentos e a
-> camada de IA privada existem e são reais na sua arquitetura de
-> segurança/isolamento, mas usam adaptadores mock para antivírus, OCR e
-> modelo de IA — ver `docs/architecture.md`, "O que é mock e o que é
-> real". Ainda não existe um painel de cruzamentos completo (Etapa 4).
-> Todos os dados usados são sintéticos. Ver `docs/roadmap.md`.
+> camada de IA privada (Etapa 3), e agora a Inteligência Integrada e os
+> relatórios controlados (Etapa 4), existem e são reais na sua
+> arquitetura de segurança/isolamento/separação métricas-vs-narrativa,
+> mas usam adaptadores mock/heurísticos para antivírus, OCR, modelo de
+> IA e narrativa de insights — ver `docs/architecture.md`, "O que é mock
+> e o que é real". Todos os dados usados são sintéticos. Ver
+> `docs/roadmap.md`.
 
 ## O que a Sobredot não faz
 
 A Sobredot não diagnostica, não prescreve, não substitui profissionais de
 saúde ou educação e não toma decisões automáticas sobre a criança. A
 camada de IA (quando ativa) organiza informação já revista por humanos —
-nunca decide, nunca sugere doses, nunca classifica a criança.
+nunca decide, nunca sugere doses, nunca classifica a criança. Os
+"insights" da Visão Integrada (Etapa 4) mostram sempre padrões
+estatísticos descritivos, nunca causa ("foi observado em conjunto",
+nunca "provocou") — ver `docs/insights.md`.
 
 ## Stack técnica
 
@@ -48,6 +53,7 @@ sobredot-ode/
 │   ├── views/                    # Um ficheiro por ecrã — ver docs/sitemap.md
 │   ├── components/               # Componentes reutilizáveis
 │   ├── services/                 # Uma camada de acesso a dados por área de negócio
+│   │                              #   (Etapa 4: insightsService, goalsService, reportsService)
 │   ├── data/mock/                 # Dados fictícios (usados pelo seed do emulador)
 │   ├── config/                    # Leitura de variáveis de ambiente
 │   └── utils/                     # DOM, formatação, validação
@@ -56,7 +62,9 @@ sobredot-ode/
 │       ├── family.js, access.js  # Famílias, convites, concessões de acesso
 │       ├── adminClaims.js, audit.js
 │       ├── documents.js, extraction.js, antivirus.js, ocr.js, contentSniff.js
-│       └── ai.js                 # Gateway de IA privado
+│       ├── ai.js                 # Gateway de IA privado
+│       ├── metrics.js, patterns.js, insights.js  # Inteligência Integrada (Etapa 4)
+│       └── reports.js            # Relatórios e partilha controlada (Etapa 4)
 ├── firestore.rules, storage.rules, firestore.indexes.json
 ├── firebase.json, .firebaserc
 ├── scripts/seed-emulator.js     # Semear o emulador com dados fictícios
@@ -135,8 +143,19 @@ família B; um profissional com concessão expirada perde o acesso; um
 colaborador escolar não lê medicação sem esse âmbito explícito;
 registos de uma criança nunca aparecem misturados com os de outra;
 ninguém se autopromove a administrador pelo cliente; a auditoria nunca
-pode ser apagada ou alterada pelo cliente; e um teste canário garante
-que uma resposta de IA sobre uma criança nunca cita documentos de outra.
+pode ser apagada ou alterada pelo cliente; um teste canário garante que
+uma resposta de IA sobre uma criança nunca cita documentos de outra; e,
+desde a Etapa 4: geração de insights com amostra pequena/período sem
+dados/fontes contraditórias/registo eliminado/dois documentos
+comparados; um profissional só pode validar/contestar (nunca gerar)
+insights, e perde essa permissão assim que a concessão expira; um
+relatório respeita sempre o escopo (módulos/documentos) pedido; um link
+de partilha recusa token errado, revogado ou expirado.
+
+`npm run test:functions` inclui ainda os testes obrigatórios da
+narrativa de insights: nenhuma frase gerada pode conter linguagem
+causal indevida, citar um número que não esteja na evidência, ou conter
+conteúdo de diagnóstico/prescrição — ver `docs/insights.md`.
 
 ## Lint
 
@@ -192,7 +211,8 @@ interface mostra sempre um aviso "Dados de demonstração".
 
 ## Limitações conhecidas desta etapa
 
-- Sem envio real de e-mail de convite (o link é copiado manualmente).
+- Sem envio real de e-mail de convite (o link é copiado manualmente, quer
+  para família quer para acessos de escola/profissionais).
 - Sem fornecedor de antivírus/OCR/IA reais ligados — interfaces prontas,
   adaptadores mock/bloqueantes (nunca simulam segurança inexistente) —
   ver `docs/vendors.md`.
@@ -200,16 +220,22 @@ interface mostra sempre um aviso "Dados de demonstração".
 - Geração de URLs assinadas de Storage não totalmente verificável em
   ambientes de desenvolvimento sem credenciais reais de assinatura — ver
   `docs/firebase-setup.md`.
-- Painel de cruzamentos completo entre registos e documentos fica para a
-  Etapa 4 — esta etapa só entrega a pergunta pontual "Perguntar aos
-  documentos".
+- A narrativa de insights usa templates fixos (sem modelo de linguagem
+  real) — ver `docs/insights.md` para a separação entre cálculo e
+  narrativa e as guardas que impedem invenção/causalidade indevida.
+- Sem geração binária de PDF no servidor — os relatórios são HTML
+  imprimível via `window.print()` do browser.
+- Os filtros da Visão Integrada (fonte/categoria/contexto) afetam só o
+  resumo do período calculado no cliente, não os padrões/cruzamentos
+  calculados pelo servidor — ver `docs/insights.md`.
 
 ## Documentação
 
 Ver a pasta [`docs/`](./docs):
 
 - `product-vision.md` — visão do produto
-- `architecture.md` — arquitetura técnica, incluindo cofre de documentos e IA
+- `architecture.md` — arquitetura técnica, incluindo cofre de documentos, IA e Inteligência Integrada
+- `insights.md` — fórmulas, limiares, modelo de insight, validação profissional e fluxo de partilha de relatórios (Etapa 4)
 - `data-model.md` — modelo de dados completo
 - `permissions.md` — catálogo de papéis e permissões
 - `firebase-setup.md` — emuladores, região, App Check, segredos

@@ -1,4 +1,4 @@
-# Catálogo de permissões — Etapas 2 e 3
+# Catálogo de permissões — Etapas 2, 3 e 4
 
 ## Princípios não negociáveis
 
@@ -57,8 +57,9 @@ Cada concessão (`accessGrants`) combina:
   documentos), `validate` (validar — reservado para o papel de
   profissional revisor confirmar itens extraídos).
 - **`scopeCategories`**: qualquer subconjunto das 10 categorias de
-  registo, mais o pseudo-âmbito `'documents'` (cofre de documentos), ou
-  `['all']` para todas.
+  registo, mais os pseudo-âmbitos `'documents'` (cofre de documentos),
+  `'insights'` (Visão Integrada, Etapa 4) e `'goals'` (metas, Etapa 4),
+  ou `['all']` para todas.
 - **`startAt` / `expiresAt`**: janela de validade obrigatória, no máximo
   365 dias a partir da criação.
 - **`grantedBy`**: sempre o proprietário da família dona da criança —
@@ -85,6 +86,20 @@ acceptAccessGrant (convidado, e-mail tem de corresponder)
 `status: 'expired'` na concessão para efeitos de interface — nunca é a
 fronteira de segurança real.
 
+## Validação profissional (Etapa 4)
+
+Não existe um segundo mecanismo de convite: um "profissional revisor"
+convidado através de "Acessos de escola e profissionais" (com
+`capabilities` incluindo `'validate'` e `scopeCategories` incluindo
+`'insights'`) pode, a partir de `#/colaborador/{childId}`, comentar,
+confirmar (`professional_validated`) ou contestar (`contested`) um
+insight — nunca editar `evidence`/`factualObservation`/o registo
+original. A família só pode marcar como `family_reviewed` ou voltar a
+`not_reviewed`. Só a família (nunca um profissional) pode gerar novos
+insights (`generateInsights`) — ver `docs/insights.md`. Como qualquer
+concessão de acesso, é sempre opcional, temporária e revogável, e nunca
+exige "cadastro profissional" prévio — só uma conta autenticada normal.
+
 ## Matriz de acesso por coleção
 
 | Coleção | Família (membro) | Colaborador com concessão | Admin | Ninguém mais |
@@ -102,6 +117,9 @@ fronteira de segurança real.
 | `.../accessIndex` | leitura (owner) | leitura da própria entrada | leitura | — |
 | `.../documents` e subcoleções | leitura/escrita (criação e eliminação lógica) | conforme âmbito `'documents'` | — (nunca) | — |
 | `.../aiQueries` | leitura | — | leitura | — |
+| `.../insights` e `.../statusHistory` | leitura; escrita só via Cloud Functions | leitura, se `view` no âmbito `'insights'`; `setInsightStatus` se `validate` no âmbito `'insights'` | — (nunca) | — |
+| `.../goals` | leitura/escrita (criação e eliminação lógica) | leitura, se `view` no âmbito `'goals'` | — (nunca) | — |
+| `.../reportShares` | leitura (só família); escrita só via Cloud Functions | — (nunca, mesmo com concessão) | — (nunca) | — |
 | `auditLog` | leitura (só da própria família) | — | leitura (tudo) | — |
 
 "Escrita" na tabela refere-se sempre às operações permitidas ao **cliente
@@ -120,10 +138,16 @@ pelo cliente, independentemente do papel.
 
 ## Testado por
 
-Ver `tests/rules/` (executado com `npm run test:rules`, 31 testes):
+Ver `tests/rules/` (executado com `npm run test:rules`, 49 testes):
 família A vs. família B; concessão expirada; colaborador escolar sem
 âmbito de medicação; isolamento de registos entre crianças da mesma
 família; impossibilidade de autopromoção a admin; imutabilidade da
 auditoria; regras do Storage negando sempre o acesso direto; lógica de
-`resolveChildAccess` (incluindo o caso de concessão expirada); e o teste
-canário de isolamento entre crianças na recuperação de contexto de IA.
+`resolveChildAccess` (incluindo o caso de concessão expirada); o teste
+canário de isolamento entre crianças na recuperação de contexto de IA; e,
+desde a Etapa 4 (`tests/rules/insightsAndReports.integration.test.js`):
+geração de insights com amostra pequena/registo eliminado/fontes
+contraditórias/dois documentos comparados; família vs. profissional a
+mudar o estado de um insight; profissional com concessão expirada ou sem
+capacidade `validate` perdendo a permissão; relatório com escopo
+parcial; link de partilha com token errado, revogado ou expirado.

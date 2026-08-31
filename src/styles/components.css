@@ -472,3 +472,62 @@
   font-weight: var(--font-weight-bold);
   margin-bottom: var(--space-2);
 }
+
+/* --- Gráfico de barras acessível (Etapa 4) ---------------------------
+   Nunca comunica significado só por cor: cada barra mostra sempre o
+   valor em texto, e existe sempre uma tabela alternativa. */
+.a11y-chart {
+  margin: 0;
+  padding: var(--space-3) 0;
+}
+
+.a11y-chart__bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.a11y-chart__row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(80px, 3fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.a11y-chart__label {
+  font-size: var(--font-size-sm);
+}
+
+.a11y-chart__track {
+  background: var(--color-neutral-100);
+  border-radius: var(--radius-full);
+  height: 10px;
+  overflow: hidden;
+}
+
+.a11y-chart__fill {
+  background: var(--color-brand-500, var(--color-info-500));
+  height: 100%;
+  border-radius: var(--radius-full);
+}
+
+.a11y-chart__value {
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.a11y-chart__table {
+  margin-top: var(--space-3);
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.a11y-chart__table th,
+.a11y-chart__table td {
+  border: 1px solid var(--color-border-strong);
+  padding: var(--space-2);
+  text-align: left;
+  font-size: var(--font-size-sm);
+}

@@ -26,7 +26,7 @@ const VALID_CAPABILITIES = ['view', 'register', 'comment', 'validate'];
 const VALID_CATEGORIES = [
   'emotions', 'behaviors', 'sleep', 'food', 'medication',
   'school', 'communication', 'sensory', 'achievements', 'observations',
-  'documents', 'all',
+  'documents', 'insights', 'goals', 'all',
 ];
 const MAX_GRANT_DAYS = 365;
 

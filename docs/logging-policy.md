@@ -16,6 +16,7 @@ si.
 | `auditLog` (Firestore, ver `functions/src/audit.js`, `access.js`) | ação (ex.: `record.created`), autor, tipo/ID do alvo, `familyId`/`childId`, e metadados técnicos limitados (ex.: `categoryId` e `source` de um registo — nunca `notes`) |
 | `children/*/aiQueries` (ver `functions/src/ai.js`) | quem perguntou, quando, se foi bloqueada, quantas fontes foram usadas, IDs dos documentos citados, duração — **nunca** o texto da pergunta nem da resposta |
 | `children/*/documents/*/versions` | checksum, tamanho, tipo real detetado, número de páginas — nunca o texto extraído |
+| `auditLog` (Etapa 4: `insights.generated`, `insight.status_changed`, `report_share.created`, `report_share.revoked`) | contagem de insights gerados, período, `patternType`/estado alterado, módulos/validade de um relatório partilhado — **nunca** o texto de um insight, o conteúdo do relatório ou o token de partilha |
 | Logs de execução das Cloud Functions (Cloud Logging / consola do emulador) | mensagens de erro técnicas (ex.: `"Invalid PDF structure"`), stack traces de exceções não tratadas | 
 
 ## O que NUNCA é registado
@@ -26,8 +27,11 @@ si.
   (ver `logAiQuery` em `functions/src/ai.js`).
 - Palavras-passe (nunca tocadas pelo nosso código — geridas inteiramente
   pelo Firebase Auth).
-- Tokens de convite ou de concessão de acesso em texto simples fora da
-  resposta única da função que os cria.
+- Tokens de convite, de concessão de acesso ou de partilha de relatório
+  em texto simples fora da resposta única da função que os cria — só o
+  seu hash (SHA-256) é guardado, nunca o log de auditoria.
+- Conteúdo de um insight (`title`, `factualObservation`, `evidence`) ou
+  de um relatório partilhado em qualquer evento de `auditLog`.
 
 ## Regras práticas ao escrever código novo
 

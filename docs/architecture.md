@@ -1,4 +1,4 @@
-# Arquitetura — estado após Etapa 3
+# Arquitetura — estado após Etapa 4
 
 ## Visão geral
 
@@ -17,7 +17,8 @@
 │    │     ├── authService, familyService, childrenService           │
 │    │     ├── recordsService, medicationsService, consentService    │
 │    │     ├── accessGrantsService, auditService (só leitura)        │
-│    │     └── documentsService, aiService (Etapa 3)                 │
+│    │     ├── documentsService, aiService (Etapa 3)                 │
+│    │     └── insightsService, goalsService, reportsService (Etapa 4)│
 │    ├── i18n/*, styles/*       (inalterados desde a Etapa 1)         │
 │    └── config/firebase.config.js (só leitura de env, sem SDK)       │
 └──────────────────────────────┬─────────────────────────────────────┘
@@ -41,7 +42,10 @@
 │    ├── adminClaims.js → onUserCreate, setAdminClaim                   │
 │    ├── audit.js     → gatilhos que escrevem auditLog (nunca o cliente)│
 │    ├── documents.js → pipeline do cofre de documentos                 │
-│    └── ai.js        → gateway de IA privado ("Perguntar aos documentos")│
+│    ├── ai.js        → gateway de IA privado ("Perguntar aos documentos")│
+│    ├── metrics.js, patterns.js → motor de métricas/cruzamentos (puros) │
+│    ├── insights.js  → narrativa grounded + generateInsights/setInsightStatus│
+│    └── reports.js   → geração de relatórios + links de partilha       │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -233,6 +237,45 @@ Nenhum fornecedor de IA real está contratado nesta etapa — ver
 qualquer contratação, e para a justificação de usar sempre um adaptador
 mock/heurístico determinístico durante o desenvolvimento.
 
+## Inteligência Integrada e relatórios (Etapa 4)
+
+Ver `docs/insights.md` para as fórmulas, limiares e o modelo de insight
+completos. Resumo arquitetural:
+
+```
+Registos/documentos aprovados
+        │
+        ▼
+metrics.js (A: cálculo puro) ──► patterns.js (B: cruzamentos puros)
+        │                                │
+        └────────────────┬───────────────┘
+                          ▼
+              insights.js (C: narrativa)
+        (só interpola números de A/B em templates fixos;
+         nunca calcula, nunca afirma causa — três guardas
+         testadas: assertNoCausalLanguage,
+         assertNumbersAreGrounded, containsBlockedIntent)
+                          │
+                          ▼
+        children/{childId}/insights (persistido, status inicial
+        "not_reviewed") ── lido pela família e por um profissional
+        com concessão de acesso com âmbito "insights"
+```
+
+`generateInsights` (callable) só pode ser disparada pela família —
+recalcula tudo a partir dos registos e dos itens de extração já
+aprovados. `setInsightStatus` (callable) é o único caminho de escrita
+sobre um insight já criado, e só altera `status` mais uma entrada
+imutável em `statusHistory`; nunca `evidence`/`factualObservation`.
+
+**Relatórios** (`functions/src/reports.js`): `generateReport` monta uma
+pré-visualização a pedido (nunca persiste nada); `createReportShareLink`
+recalcula o mesmo conteúdo no servidor e guarda-o **congelado** num
+documento `reportShares`, protegido por um token opaco cujo hash SHA-256
+é o único valor guardado. O acesso público a um link de partilha nunca é
+uma leitura direta do Firestore — só `getSharedReport`, que verifica o
+token, a expiração e a revogação. Ver `docs/decisions.md`, decisão 18.
+
 ## Componentes vs. Vistas
 
 Inalterado desde a Etapa 1: vistas (`src/views/**/xxxView.js`) montam um
@@ -267,7 +310,11 @@ nenhuma condição de acesso. Ver `docs/threat-model.md`, risco 1.
 | Peça | Estado |
 |---|---|
 | Autenticação (e-mail/palavra-passe) | **Real** (Firebase Auth) |
-| Firestore (famílias, crianças, registos, documentos, auditoria) | **Real** (regras testadas, 31 testes automatizados) |
+| Firestore (famílias, crianças, registos, documentos, insights, metas, partilhas, auditoria) | **Real** (regras testadas, 49 testes automatizados) |
+| Motor de métricas/cruzamentos (Etapa 4) | **Real** — cálculo determinístico, sem IA nenhuma |
+| Narrativa de insights (Etapa 4) | **Real** o mecanismo de grounding/guardas; **sem** modelo de linguagem — templates fixos, tal como o gateway de IA da Etapa 3 |
+| Geração de PDF de relatórios | **Não implementado** — HTML imprimível via `window.print()` do browser |
+| Link de partilha de relatório | **Real** — token opaco, hash guardado, conteúdo congelado no servidor |
 | Storage (bucket privado) | **Real**, mas acesso do cliente sempre mediado por Cloud Functions |
 | Custom claims de administrador | **Real**, atribuição inicial manual (bootstrap), depois via função |
 | Extração de texto de PDF/DOCX | **Real** (`pdf-parse`, `mammoth`) |

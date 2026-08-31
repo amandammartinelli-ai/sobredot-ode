@@ -4,7 +4,7 @@
  * Firestore e invoca essas funções.
  */
 import { httpsCallable } from 'firebase/functions';
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore';
 import { db, functions } from '../firebase/app.js';
 
 const createAccessGrantFn = httpsCallable(functions, 'createAccessGrant');
@@ -34,6 +34,18 @@ export async function acceptAccessGrant(childId, grantId) {
 
 export async function revokeAccessGrant(childId, grantId) {
   await revokeAccessGrantFn({ childId, grantId });
+}
+
+/**
+ * Lê a própria entrada no índice de acesso "achatado" de uma criança —
+ * usado pela vista do colaborador (escola/profissional) para saber que
+ * capacidades/âmbito realmente tem, sem confiar em nada guardado
+ * localmente (ver firestore.rules: só o próprio uid pode ler a sua
+ * entrada, ou o proprietário da família).
+ */
+export async function getOwnAccessIndex(childId, uid) {
+  const snap = await getDoc(doc(db, `children/${childId}/accessIndex/${uid}`));
+  return snap.exists() ? snap.data() : null;
 }
 
 export function isGrantActive(grant) {

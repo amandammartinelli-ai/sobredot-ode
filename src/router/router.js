@@ -16,6 +16,9 @@ import { renderDocumentsView } from '../views/documents/documentsView.js';
 import { renderDocumentDetailView } from '../views/documents/documentDetailView.js';
 import { renderInsightsView } from '../views/insights/insightsView.js';
 import { renderReportsView } from '../views/reports/reportsView.js';
+import { renderSharedReportView } from '../views/reports/sharedReportView.js';
+import { renderOdeLibraryView } from '../views/library/odeLibraryView.js';
+import { renderCollaboratorView } from '../views/collaborator/collaboratorView.js';
 import { renderFamilyView } from '../views/family/familyView.js';
 import { renderAcceptInviteView } from '../views/family/acceptInviteView.js';
 import { renderProfileView } from '../views/profile/profileView.js';
@@ -47,6 +50,9 @@ const routes = {
   documento: { view: renderDocumentDetailView, access: 'family', showChrome: true },
   insights: { view: renderInsightsView, access: 'family', showChrome: true },
   reports: { view: renderReportsView, access: 'family', showChrome: true },
+  'relatorio-partilhado': { view: renderSharedReportView, access: 'public', showChrome: false },
+  'biblioteca-ode': { view: renderOdeLibraryView, access: 'family', showChrome: true },
+  colaborador: { view: renderCollaboratorView, access: 'auth', showChrome: false },
   family: { view: renderFamilyView, access: 'family', showChrome: true },
   'aceitar-convite': { view: renderAcceptInviteView, access: 'public', showChrome: false },
   profile: { view: renderProfileView, access: 'family', showChrome: true },

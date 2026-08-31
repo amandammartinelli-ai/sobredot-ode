@@ -4,8 +4,9 @@ Documento vivo, atualizado a cada etapa. Desde a Etapa 2, existe
 autenticação real (Firebase Auth) e um backend real (Firestore, Storage,
 Cloud Functions), embora ainda só com dados sintéticos. Os riscos 1–6
 abaixo (originalmente escritos como prospetivos na Etapa 1) já têm
-mitigação real implementada e testada; os riscos 7–10 são novos, da
-Etapa 3 (cofre de documentos e IA).
+mitigação real implementada e testada; os riscos 7–10 são da Etapa 3
+(cofre de documentos e IA); os riscos 11–13 são novos, da Etapa 4
+(Inteligência Integrada e relatórios).
 
 ## O que está fora de âmbito
 
@@ -155,6 +156,52 @@ operacionais (família, membros, concessões, auditoria). A custom claim
 `admin` só pode ser atribuída por outro administrador já existente
 (nunca pelo próprio utilizador) — testado em `tests/rules/` (secção
 "Autopromoção a administrador").
+
+### 11. Narrativa de insight a inventar números, afirmar causa ou diagnosticar
+**Risco:** a camada de narrativa da "Visão Integrada" (Etapa 4) citar um
+número que não veio de nenhum cálculo real, usar linguagem causal
+("provoca", "causa") sem evidência profissional externa, ou deslizar
+para diagnóstico/prescrição.
+**Mitigação implementada e testada:** separação arquitetural rígida —
+`functions/src/metrics.js`/`patterns.js` (só cálculo) nunca são tocados
+pela camada de narrativa (`functions/src/insights.js`), que só interpola
+os números já calculados em templates fixos. Três guardas correm sobre
+**todo** insight antes de ser persistido: `assertNoCausalLanguage`
+(padrões de linguagem causal banidos), `assertNumbersAreGrounded` (todo
+número do texto tem de aparecer literalmente na evidência declarada) e
+`containsBlockedIntent` (reutilizado do gateway de IA da Etapa 3). Uma
+violação substitui o insight inteiro por um texto de bloqueio neutro.
+Testado em `functions/test/insights.test.js` e
+`tests/rules/insightsAndReports.integration.test.js` — incluindo um caso
+real encontrado durante o desenvolvimento (um número correto mas não
+citado na evidência foi corretamente bloqueado pela própria guarda, o
+que obrigou a corrigir o código para incluir esse número na evidência).
+
+### 12. Profissional a editar silenciosamente um insight ou o registo original
+**Risco:** um profissional convidado para validar insights conseguir, na
+prática, alterar o conteúdo computado (evidência, texto factual) ou o
+registo do quotidiano subjacente.
+**Mitigação implementada e testada:** `setInsightStatus` só escreve o
+campo `status` e acrescenta uma entrada imutável em `statusHistory`
+(autoria, data, comentário) — nunca toca em `evidence`,
+`factualObservation` nem em nenhum registo. `firestore.rules` nega
+sempre escrita direta do cliente em `insights` e `statusHistory`. Testado
+explicitamente, incluindo o caso de uma concessão expirada perder a
+permissão de validar (`tests/rules/insightsAndReports.integration.test.js`).
+
+### 13. Fuga de dados através de um link de relatório partilhado
+**Risco:** um link de partilha de relatório expor mais informação do que
+a família escolheu, continuar acessível depois de revogado/expirado, ou
+o próprio link (URL/e-mail/notificação) conter dados sensíveis.
+**Mitigação implementada e testada:** o conteúdo do relatório é sempre
+recalculado no servidor a partir dos parâmetros escolhidos (nunca aceite
+pronto do cliente) e guardado **congelado** no momento da criação; o
+acesso público nunca é uma leitura direta do Firestore, só a Cloud
+Function `getSharedReport`, que verifica um token opaco (hash SHA-256,
+comparação "timing-safe") e recusa explicitamente links revogados ou
+expirados, com mensagens distintas. O token não deriva de nenhum dado
+pessoal. Testado com token errado, link revogado e link expirado
+(`tests/rules/insightsAndReports.integration.test.js`).
 
 ## Perguntas em aberto para etapas futuras
 

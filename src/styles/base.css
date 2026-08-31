@@ -8,6 +8,18 @@
   box-sizing: border-box;
 }
 
+/*
+ * Garante que o atributo `hidden` esconde SEMPRE o elemento, mesmo
+ * quando uma regra de classe (ex.: `.app-nav { display: flex }`) tem
+ * mais especificidade do que o estilo por omissão do agente de
+ * utilizador para `[hidden]`. Sem isto, alternar `nav.hidden`/
+ * `header.hidden` (ver src/router/router.js, `setChromeVisible`) não
+ * tem qualquer efeito visual nestes elementos.
+ */
+[hidden] {
+  display: none !important;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   color-scheme: light;

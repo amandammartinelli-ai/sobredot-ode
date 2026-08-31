@@ -12,6 +12,8 @@ const adminClaims = require('./src/adminClaims');
 const audit = require('./src/audit');
 const documents = require('./src/documents');
 const ai = require('./src/ai');
+const insights = require('./src/insights');
+const reports = require('./src/reports');
 
 // Exportação explícita: só funções Cloud Functions reais (callables e
 // gatilhos). Utilitários puros (ex.: containsBlockedIntent,
@@ -46,4 +48,12 @@ module.exports = {
   purgeExpiredDocuments: documents.purgeExpiredDocuments,
   // gateway de IA
   askDocuments: ai.askDocuments,
+  // Inteligência Integrada (Etapa 4)
+  generateInsights: insights.generateInsights,
+  setInsightStatus: insights.setInsightStatus,
+  // relatórios e partilha controlada
+  generateReport: reports.generateReport,
+  createReportShareLink: reports.createReportShareLink,
+  revokeReportShareLink: reports.revokeReportShareLink,
+  getSharedReport: reports.getSharedReport,
 };

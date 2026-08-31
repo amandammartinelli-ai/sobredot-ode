@@ -412,6 +412,63 @@ service cloud.firestore {
         allow list: if isChildFamilyOwner(childId) || isAdmin();
         allow write: if false;
       }
+
+      // -- Inteligência Integrada (Etapa 4) ---------------------------
+      // Insights são SEMPRE calculados e escritos por Cloud Functions
+      // (generateInsights, setInsightStatus) — o cliente nunca cria nem
+      // edita `evidence`/`factualObservation`/`metricsSnapshot`
+      // diretamente (isso eliminaria, por construção, a garantia de que
+      // todo número citado veio do motor de métricas). O estado
+      // (`status`) e o histórico de validação também só mudam através de
+      // `setInsightStatus`, nunca por escrita direta — garante que um
+      // profissional nunca "edita silenciosamente" o insight ou o
+      // registo original (ver docs/permissions.md).
+      match /insights/{insightId} {
+        allow read: if canViewCategory(childId, 'insights');
+        allow write: if false;
+
+        match /statusHistory/{entryId} {
+          allow read: if canViewCategory(childId, 'insights');
+          allow write: if false;
+        }
+      }
+
+      // -- metas acompanháveis -----------------------------------------
+      // Ao contrário dos insights, uma meta é sempre uma declaração da
+      // família (mesmo quando "importada" de um documento, o que entra
+      // aqui é só uma cópia de texto que a família decidiu adotar como
+      // meta própria — nunca uma obrigação derivada automaticamente de
+      // uma recomendação). Por isso o cliente escreve diretamente, à
+      // semelhança de `consents`/`tags`.
+      match /goals/{goalId} {
+        allow read: if canViewCategory(childId, 'goals');
+        allow create: if isChildFamilyMember(childId)
+          && request.resource.data.childId == childId
+          && request.resource.data.familyId == childData(childId).familyId
+          && request.resource.data.createdBy == uid()
+          && request.resource.data.deletedAt == null
+          && isValidString(request.resource.data.title, 200)
+          && request.resource.data.origin in ['family', 'document'];
+        allow update: if isChildFamilyMember(childId)
+          && request.resource.data.childId == resource.data.childId
+          && request.resource.data.familyId == resource.data.familyId
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.origin == resource.data.origin
+          && request.resource.data.updatedBy == uid();
+        allow delete: if false; // exclusão é sempre lógica (deletedAt)
+      }
+
+      // -- ligações de partilha de relatórios ----------------------------
+      // Só a família gere partilhas (nunca um colaborador externo, mesmo
+      // com concessão de "view"). O acesso público através do link em si
+      // NUNCA passa por uma leitura direta do Firestore — só pela Cloud
+      // Function `getSharedReport`, que verifica o token e devolve
+      // exclusivamente o conteúdo já congelado no momento da partilha
+      // (ver docs/decisions.md, decisão 14, o mesmo padrão do Storage).
+      match /reportShares/{shareId} {
+        allow read: if isChildFamilyMember(childId);
+        allow write: if false;
+      }
     }
 
     // Query de grupo de coleção usada para "a que crianças tenho acesso

@@ -23,8 +23,14 @@ import { createErrorState } from '../../components/states/errorState.js';
 const CAPABILITY_OPTIONS = ['view', 'register', 'comment', 'validate'];
 const CATEGORY_OPTIONS = [
   'emotions', 'behaviors', 'sleep', 'food', 'medication',
-  'school', 'communication', 'sensory', 'achievements', 'observations', 'documents',
+  'school', 'communication', 'sensory', 'achievements', 'observations',
+  'documents', 'insights', 'goals',
 ];
+const SPECIAL_SCOPE_LABEL_KEYS = {
+  documents: 'family.grantScopeDocuments',
+  insights: 'family.grantScopeInsights',
+  goals: 'family.grantScopeGoals',
+};
 
 export async function renderFamilyView() {
   const { familyId, children } = await loadChildContext();
@@ -155,7 +161,7 @@ export async function renderFamilyView() {
     const categoryChecks = CATEGORY_OPTIONS.map((category) =>
       h('label', { class: 'chip-option' }, [
         h('input', { type: 'checkbox', value: category }),
-        category === 'documents' ? t('family.grantScopeDocuments') : t(`register.categories.${category}.label`),
+        SPECIAL_SCOPE_LABEL_KEYS[category] ? t(SPECIAL_SCOPE_LABEL_KEYS[category]) : t(`register.categories.${category}.label`),
       ])
     );
     const expiresInput = h('input', { class: 'input', type: 'date', id: 'grant-expires', required: true });
@@ -228,14 +234,24 @@ export async function renderFamilyView() {
                   .map((input) => input.value);
 
                 try {
-                  await createAccessGrant(selectedChildId, {
+                  const grantId = await createAccessGrant(selectedChildId, {
                     granteeEmail: granteeEmailInput.value.trim(),
                     role: roleSelect.value,
                     capabilities: capabilities.length ? capabilities : ['view'],
                     scopeCategories: scopeCategories.length ? scopeCategories : ['school'],
                     expiresAtMillis: new Date(expiresInput.value).getTime(),
                   });
-                  render();
+                  const link = `${window.location.origin}${window.location.pathname}#/colaborador/${selectedChildId}/${grantId}`;
+                  mount(feedback, [
+                    h('div', { class: 'notice notice--success' }, [
+                      h('p', {}, [t('family.grantLinkCreatedBody')]),
+                      h('code', { style: 'word-break:break-all' }, [link]),
+                    ]),
+                  ]);
+                  // Não chama render() aqui: recarregaria a secção inteira e
+                  // apagaria a mensagem com o link antes de a família a poder
+                  // copiar (só a lista de acessos concedidos ficaria
+                  // desatualizada até à próxima navegação — aceitável).
                 } catch (err) {
                   mount(feedback, [createErrorState({ body: err.message })]);
                 }
