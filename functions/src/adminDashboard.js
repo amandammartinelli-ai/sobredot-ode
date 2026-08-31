@@ -42,9 +42,9 @@ async function getOperationalSummaryHandler() {
     documentsByStatus,
   ] = await Promise.all([
     countOf(db.collection('families')),
-    countOf(db.collectionGroup('children').where('deletedAt', '==', null)),
+    countOf(db.collection('children').where('deletedAt', '==', null)),
     countOf(db.collection('families').where('deletionRequest.status', '==', 'pending')),
-    countOf(db.collectionGroup('children').where('processingRestricted', '==', true)),
+    countOf(db.collection('children').where('processingRestricted', '==', true)),
     countOf(db.collectionGroup('aiQueries').where('createdAt', '>=', since24h)),
     countOf(
       db.collectionGroup('aiQueries').where('createdAt', '>=', since24h).where('blocked', '==', true)
