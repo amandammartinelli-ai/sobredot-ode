@@ -44,11 +44,6 @@
       ]
     },
     {
-      "collectionGroup": "members",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [{ "fieldPath": "uid", "order": "ASCENDING" }]
-    },
-    {
       "collectionGroup": "accessIndex",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
@@ -57,22 +52,12 @@
       ]
     },
     {
-      "collectionGroup": "accessIndex",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [{ "fieldPath": "expiresAt", "order": "ASCENDING" }]
-    },
-    {
       "collectionGroup": "accessGrants",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "expiresAt", "order": "ASCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "documents",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [{ "fieldPath": "deletedAt", "order": "ASCENDING" }]
     },
     {
       "collectionGroup": "documents",
@@ -98,11 +83,6 @@
         { "fieldPath": "deletedAt", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "aiQueries",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [{ "fieldPath": "createdAt", "order": "ASCENDING" }]
     },
     {
       "collectionGroup": "aiQueries",
