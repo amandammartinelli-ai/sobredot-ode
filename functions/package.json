@@ -18,7 +18,7 @@
     "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
-    "eslint": "^8.57.1",
-    "vitest": "^1.6.1"
+    "eslint": "^10.9.1",
+    "vitest": "^4.1.11"
   }
 }
