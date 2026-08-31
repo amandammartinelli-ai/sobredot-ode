@@ -1,21 +1,18 @@
 import { h } from '../utils/dom.js';
 import { t } from '../i18n/index.js';
-import { listChildren, getSelectedChildId, setSelectedChildId } from '../services/childrenService.js';
-
-const originLabelKey = {
-  ode: 'origin.ode',
-  partner: 'origin.partner',
-  direct: 'origin.direct',
-};
+import { getInitials } from '../utils/format.js';
+import { setSelectedChildId } from '../services/childrenService.js';
 
 /**
- * Seletor de criança. Chama `onChange(childId)` quando a seleção muda,
- * para que a vista que o usa possa voltar a desenhar-se.
+ * Seletor de criança. Recebe a lista de crianças já carregada pela vista
+ * (dados assíncronos não pertencem a este componente) e a criança
+ * selecionada. Chama `onChange(childId)` quando a seleção muda, para que
+ * a vista possa voltar a desenhar-se com os dados da nova criança.
  */
-export function createChildSelector(onChange) {
-  const children = listChildren();
-  const selectedId = getSelectedChildId();
-  const selectedChild = children.find((child) => child.id === selectedId) || children[0];
+export function createChildSelector({ children, selectedChild, onChange }) {
+  if (!selectedChild) {
+    return h('p', { class: 'card__meta' }, ['—']);
+  }
 
   const select = h(
     'select',
@@ -27,12 +24,12 @@ export function createChildSelector(onChange) {
       },
     },
     children.map((child) =>
-      h('option', { value: child.id, selected: child.id === selectedId || undefined }, [child.name])
+      h('option', { value: child.id, selected: child.id === selectedChild.id || undefined }, [child.name])
     )
   );
 
   return h('div', { class: 'child-selector' }, [
-    h('span', { class: 'child-selector__avatar', 'aria-hidden': 'true' }, [selectedChild.avatarInitials]),
-    h('div', {}, [select, h('p', { class: 'child-selector__origin' }, [t(originLabelKey[selectedChild.relationshipOrigin])])]),
+    h('span', { class: 'child-selector__avatar', 'aria-hidden': 'true' }, [getInitials(selectedChild.name)]),
+    h('div', {}, [select, h('p', { class: 'child-selector__origin' }, [t(`origin.${selectedChild.relationshipOrigin}`)])]),
   ]);
 }

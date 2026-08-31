@@ -3,48 +3,83 @@
 Este documento acompanha a construção gradual da Sobredot. Cada etapa deve
 ser concluída, validada e aprovada antes de avançar para a seguinte.
 
-## Etapa 1 — Fundação do produto (esta etapa)
+## Etapa 1 — Fundação do produto ✅ concluída
 
 - Estrutura de projeto, sistema de design, protótipo navegável com dados
   fictícios, i18n preparado, documentação inicial, configuração de
   build/deploy sem segredos reais.
 - Sem autenticação real, sem upload de documentos, sem IA.
 
-## Etapa 2 — Autenticação e contas reais (prevista)
+## Etapa 2 — Identidade, família, criança, permissões e registos ✅ concluída
 
-- Ligação ao Firebase Authentication (email/palavra-passe e/ou
-  fornecedores sociais, a decidir).
-- Modelo de conta: encarregado de educação, criança, convite de
-  colaboradores (escola/profissional), papéis e permissões.
-- Firestore: modelo de dados real para crianças, registos e relações,
-  substituindo os dados fictícios em `src/data/mock/`.
-- Regras de segurança do Firestore alinhadas com `docs/threat-model.md`
-  (nenhum acesso automático da ODE a dados sensíveis).
-- Firebase App Check ativado.
+- Firebase Authentication real (e-mail/palavra-passe, verificação de
+  e-mail, recuperação de palavra-passe). Login social preparado, não
+  ativado.
+- Modelo de dados real: utilizadores, famílias, membros, convites,
+  crianças, consentimentos, concessões de acesso, registos quotidianos
+  estruturados, medicamentos, auditoria — ver `docs/data-model.md`.
+- Papéis: responsável proprietário, cuidador familiar, colaborador da
+  escola, profissional revisor, administrador técnico (sem acesso a
+  conteúdo sensível por padrão) — ver `docs/permissions.md`.
+- Regras do Firestore deny-by-default, custom claims só do servidor,
+  auditoria imutável pelo cliente — 31 testes automatizados contra o
+  Firebase Emulator Suite (`npm run test:rules`).
+- Onboarding, gestão de família/convites/acessos, registo estruturado
+  com as 10 categorias, linha do tempo com filtros/edição/histórico,
+  dashboard com estatísticas descritivas simples, área de
+  consentimentos.
 
-## Etapa 3 — Registo completo e sincronização (prevista)
+## Etapa 3 — Cofre de Documentos e IA privada ✅ concluída
 
-- Persistência real dos registos das dez categorias (hoje só locais).
-- Edição e remoção de registos, histórico de alterações.
-- Sincronização entre dispositivos/colaboradores da mesma criança.
-- Notificações básicas (ex.: lembrete de medicação), sem automação clínica.
+- Cloud Storage privado, sem acesso direto do cliente — upload/download
+  sempre por URL assinada emitida por uma Cloud Function que verifica a
+  permissão no Firestore (ver `docs/decisions.md`, decisão 14).
+- Pipeline servidor de validação e extração: verificação de conteúdo
+  real (assinatura de bytes), extração de texto real (PDF/DOCX),
+  extração estruturada por heurística de secções, revisão humana
+  obrigatória antes de qualquer item entrar na visão integrada.
+- Interfaces reais de antivírus e OCR, sem serviço ligado — bloqueiam
+  explicitamente em vez de simular segurança/capacidade inexistente.
+- Gateway de IA privado ("Perguntar aos documentos"): isolamento por
+  criança e família decidido sempre no servidor, defesa contra prompt
+  injection, bloqueio de pedidos de diagnóstico/prescrição/alteração de
+  medicação, respostas sempre citáveis. Nenhum fornecedor de IA real
+  contratado — adaptador mock/heurístico, nunca usado para treinar
+  nenhum modelo (ver `docs/vendors.md`).
+- Teste canário de isolamento entre crianças na recuperação de contexto
+  de IA (`tests/rules/aiRetrieval.canary.test.js`).
 
-## Etapa 4 — Documentos e relatórios (prevista)
+## Etapa 4 — Painel de cruzamentos e relatórios avançados (prevista)
 
-- Upload de laudos, avaliações e relatórios para o Cloud Storage.
-- Geração de relatórios/resumos do percurso a partir dos registos
-  existentes (sem IA nesta etapa — resumo estruturado, não interpretativo).
-- Controlo de partilha explícito por documento e por pessoa.
+- Painel completo de cruzamentos entre registos do quotidiano e
+  documentos aprovados (a Etapa 3 entrega só a pergunta pontual
+  "Perguntar aos documentos", não um painel de insights cruzados
+  contínuo).
+- Geração de relatórios/resumos do percurso, exportáveis e prontos a
+  partilhar com profissionais, sempre com a mesma disciplina de citação
+  de fontes da Etapa 3.
+- Ligação real a um fornecedor de IA, só depois de satisfeitos todos os
+  requisitos contratuais documentados em `docs/vendors.md` (DPA,
+  retenção, localização, subcontratantes, não uso para treino).
+- Validação end-to-end de URLs assinadas de Storage num ambiente com
+  credenciais reais (não verificável no sandbox de desenvolvimento desta
+  etapa — ver `docs/firebase-setup.md`).
+- Serviço real de antivírus e, se necessário, de OCR.
 
-## Etapa 5 — Insights com IA (prevista)
+## Etapa 5 — Preparação para produção e lançamento (prevista)
 
-- Cruzamento assistido por IA entre registos do quotidiano e documentos
-  carregados, sempre apresentado como **apoio à compreensão**, nunca como
-  diagnóstico, prescrição ou decisão automática.
-- Explicabilidade mínima: toda a sugestão de insight deve indicar em que
-  registos/documentos se baseia.
-- Revisão de privacidade dedicada antes do lançamento desta etapa, dado o
-  processamento de dados de saúde por terceiros (modelo de IA).
+- Revisão de privacidade e segurança dedicada antes de qualquer dado
+  real, incluindo avaliação de impacto se aplicável.
+- Multi-família por criança (ex.: pais em agregados separados) — ver
+  `docs/decisions.md`, decisão 11.
+- Envio real de e-mail para convites (fornecedor a contratar).
+- Notificações (push/e-mail) sem conteúdo sensível, alinhadas com
+  `docs/logging-policy.md`.
+- Auditoria e monitorização operacional para produção (alertas,
+  dashboards de saúde do sistema).
+- Deploy de produção do Firebase (projeto real, região confirmada,
+  regras de Storage/Firestore publicadas, App Check obrigatório sem
+  modo de depuração).
 
 ---
 

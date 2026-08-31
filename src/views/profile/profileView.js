@@ -1,48 +1,38 @@
 import { h, mount } from '../../utils/dom.js';
 import { t } from '../../i18n/index.js';
-import { mockDemoUser } from '../../data/mock/user.js';
-import { listChildren } from '../../services/childrenService.js';
-import { exitDemoMode } from '../../services/authService.js';
-import { clearAllSobredotData } from '../../services/storageService.js';
+import { getCurrentUser, signOutUser, isEmailVerified, resendVerificationEmail } from '../../services/authService.js';
 import { getReducedMotionPreference, setReducedMotionPreference } from '../../services/preferencesService.js';
-import { openConfirmDialog } from '../../components/confirmDialog.js';
-
-const originLabelKey = {
-  ode: 'origin.ode',
-  partner: 'origin.partner',
-  direct: 'origin.direct',
-};
 
 export function renderProfileView() {
   const container = h('div', { class: 'container view' });
+  const user = getCurrentUser();
 
   function render() {
-    const children = listChildren();
-
     mount(container, [
       h('header', { class: 'view__header' }, [h('h1', {}, [t('profile.title')]), h('p', { class: 'view__lead' }, [t('profile.subtitle')])]),
 
       h('section', { class: 'card', style: 'margin-bottom: var(--space-4)' }, [
         h('h2', { style: 'font-size:var(--font-size-md)' }, [t('profile.sectionAccount')]),
-        h('p', { style: 'margin:0' }, [mockDemoUser.name]),
-        h('p', { class: 'card__meta' }, [mockDemoUser.role]),
-        h('span', { class: 'category-chip', style: '--chip-color: var(--color-info-100); margin-top: var(--space-2); display:inline-flex' }, [
-          t('demo.modeLabel'),
-        ]),
+        h('p', { style: 'margin:0' }, [user.displayName || user.email]),
+        h('p', { class: 'card__meta' }, [user.email]),
+        !isEmailVerified()
+          ? h('div', { class: 'notice notice--warning', style: 'margin-top: var(--space-3)' }, [
+              h('p', { style: 'margin:0' }, [t('auth.verifyEmail.notice')]),
+              h('button', {
+                type: 'button',
+                class: 'btn btn--secondary',
+                style: 'margin-top: var(--space-2)',
+                onClick: async (event) => {
+                  await resendVerificationEmail();
+                  event.target.textContent = t('auth.verifyEmail.resent');
+                },
+              }, [t('auth.verifyEmail.resend')]),
+            ])
+          : '',
       ]),
 
       h('section', { class: 'card', style: 'margin-bottom: var(--space-4)' }, [
-        h('h2', { style: 'font-size:var(--font-size-md)' }, [t('profile.sectionChildren')]),
-        h(
-          'ul',
-          { style: 'list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:var(--space-2)' },
-          children.map((child) =>
-            h('li', { style: 'display:flex; justify-content:space-between; gap:var(--space-3)' }, [
-              h('span', {}, [child.name]),
-              h('span', { class: 'card__meta' }, [t(originLabelKey[child.relationshipOrigin])]),
-            ])
-          )
-        ),
+        h('a', { href: '#/family', class: 'btn btn--secondary btn--block' }, [t('profile.goToFamily')]),
       ]),
 
       h('section', { class: 'card', style: 'margin-bottom: var(--space-4)' }, [
@@ -67,36 +57,16 @@ export function renderProfileView() {
       h('section', { class: 'card', style: 'margin-bottom: var(--space-4)' }, [
         h('h2', { style: 'font-size:var(--font-size-md)' }, [t('profile.sectionPrivacy')]),
         h('p', {}, [t('profile.privacyNote')]),
-        h(
-          'button',
-          {
-            type: 'button',
-            class: 'btn btn--danger',
-            onClick: () => {
-              openConfirmDialog({
-                title: t('profile.clearLocalData'),
-                body: t('profile.privacyNote'),
-                confirmLabel: t('common.confirm'),
-                cancelLabel: t('common.cancel'),
-                onConfirm: () => {
-                  clearAllSobredotData();
-                  window.location.hash = '#/welcome';
-                },
-              });
-            },
-          },
-          [t('profile.clearLocalData')]
-        ),
       ]),
 
       h('button', {
         type: 'button',
         class: 'btn btn--secondary btn--block',
-        onClick: () => {
-          exitDemoMode();
+        onClick: async () => {
+          await signOutUser();
           window.location.hash = '#/welcome';
         },
-      }, [t('profile.exitDemo')]),
+      }, [t('auth.signOut')]),
     ]);
   }
 

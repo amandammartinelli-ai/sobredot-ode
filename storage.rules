@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// ============================================================================
+// Regras de segurança do Cloud Storage — Sobredot
+//
+// DECISÃO DE ARQUITETURA (ver docs/decisions.md): o cliente NUNCA acede
+// diretamente ao bucket, nem para enviar nem para ler ficheiros. Tanto o
+// upload como o download passam sempre por uma Cloud Function
+// (getDocumentUploadUrl / getDocumentDownloadUrl, em functions/src/
+// documents.js) que verifica o vínculo com a criança no Firestore através
+// do Admin SDK (que não está sujeito a nenhuma regra) e devolve uma URL
+// assinada de curta duração.
+//
+// Durante o desenvolvimento desta etapa, tentou-se inicialmente autorizar
+// o acesso direto ao bucket com regras que chamam `firestore.get()` /
+// `firestore.exists()` a partir das regras do Storage (o padrão
+// documentado pela Firebase para este cenário). Essa chamada entre
+// serviços mostrou-se pouco fiável no Firebase Emulator Suite local deste
+// ambiente — falhava de forma consistente mesmo com os documentos
+// confirmadamente presentes no Firestore (ver docs/decisions.md e os
+// testes em tests/rules/). Em vez de depender de uma funcionalidade que
+// não se conseguiu validar de forma fiável, optou-se por este desenho
+// mais simples e mais fácil de auditar: bucket sempre privado, acesso
+// sempre mediado pelo servidor. Isto é estritamente mais restritivo do
+// que a alternativa, nunca menos seguro.
+// ============================================================================
+
+service firebase.storage {
+  match /{allPaths=**} {
+    allow read, write: if false;
+  }
+}

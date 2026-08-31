@@ -1,0 +1,445 @@
+rules_version = '2';
+
+// ============================================================================
+// Regras de segurança do Firestore — Sobredot
+//
+// Princípio geral: DENY BY DEFAULT. Cada coleção só permite exatamente as
+// operações descritas em docs/permissions.md. Nada é permitido "por engano"
+// — qualquer caminho não coberto explicitamente abaixo é recusado pela
+// regra universal no final deste ficheiro.
+//
+// Estas regras NUNCA confiam em nenhum campo enviado pelo cliente para
+// decidir permissões (ex.: um campo "role" dentro do próprio documento).
+// A única fonte de verdade para papéis é:
+//   1. Custom claims do Firebase Auth (definidos apenas no servidor/Cloud
+//      Functions) — usado só para o papel de administrador técnico.
+//   2. Documentos de vínculo geridos pelo servidor (families/*/members,
+//      children/*/accessIndex) — nunca escritos diretamente pelo cliente.
+//
+// Ver docs/data-model.md para a forma de cada documento e docs/permissions.md
+// para o catálogo de papéis e capacidades.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------
+    // Funções auxiliares
+    // ------------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    // Administrador técnico: custom claim atribuída apenas por Cloud
+    // Function (ver functions/index.js, setAdminClaim). O admin NUNCA tem,
+    // por si só, acesso a conteúdo sensível de crianças (children/records/
+    // medications/consents) — apenas a metadados operacionais explicitamente
+    // marcados abaixo. Ver docs/threat-model.md, risco 1.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function familyMemberRef(familyId) {
+      return /databases/$(database)/documents/families/$(familyId)/members/$(uid());
+    }
+
+    function isFamilyMember(familyId) {
+      return isSignedIn() && exists(familyMemberRef(familyId));
+    }
+
+    function familyMemberData(familyId) {
+      return get(familyMemberRef(familyId)).data;
+    }
+
+    function isFamilyOwner(familyId) {
+      return isFamilyMember(familyId) && familyMemberData(familyId).role == 'owner';
+    }
+
+    function childRef(childId) {
+      return /databases/$(database)/documents/children/$(childId);
+    }
+
+    function childData(childId) {
+      return get(childRef(childId)).data;
+    }
+
+    function isChildFamilyMember(childId) {
+      return isFamilyMember(childData(childId).familyId);
+    }
+
+    function isChildFamilyOwner(childId) {
+      return isFamilyOwner(childData(childId).familyId);
+    }
+
+    // accessIndex é um documento "achatado" mantido só por Cloud Function
+    // (gatilho onWrite de accessGrants) — nunca escrito pelo cliente. É a
+    // única fonte de verdade, ao nível das regras, para acesso de
+    // escola/profissional a uma criança específica.
+    function accessIndexRef(childId) {
+      return /databases/$(database)/documents/children/$(childId)/accessIndex/$(uid());
+    }
+
+    function hasAccessIndex(childId) {
+      return isSignedIn() && exists(accessIndexRef(childId));
+    }
+
+    function accessIndexData(childId) {
+      return get(accessIndexRef(childId)).data;
+    }
+
+    // Uma concessão só é válida enquanto não expirou. Nunca confiamos num
+    // campo "status" — comparamos sempre o timestamp real. Isto garante que
+    // um profissional expirado perde acesso mesmo que nenhuma função de
+    // manutenção tenha ainda corrido.
+    function grantActive(childId) {
+      return hasAccessIndex(childId) && accessIndexData(childId).expiresAt > request.time;
+    }
+
+    function grantHasCapability(childId, capability) {
+      return grantActive(childId) && capability in accessIndexData(childId).capabilities;
+    }
+
+    function grantCoversCategory(childId, categoryId) {
+      return grantActive(childId) &&
+        (('all' in accessIndexData(childId).scopeCategories) ||
+         (categoryId in accessIndexData(childId).scopeCategories));
+    }
+
+    function canViewChild(childId) {
+      return isChildFamilyMember(childId) || grantHasCapability(childId, 'view');
+    }
+
+    function canViewCategory(childId, categoryId) {
+      return isChildFamilyMember(childId) ||
+        (grantHasCapability(childId, 'view') && grantCoversCategory(childId, categoryId));
+    }
+
+    function canRegisterCategory(childId, categoryId) {
+      return isChildFamilyMember(childId) ||
+        (grantHasCapability(childId, 'register') && grantCoversCategory(childId, categoryId));
+    }
+
+    function canCommentCategory(childId, categoryId) {
+      return isChildFamilyMember(childId) ||
+        (grantHasCapability(childId, 'comment') && grantCoversCategory(childId, categoryId));
+    }
+
+    function isValidString(value, maxLen) {
+      return value is string && value.size() <= maxLen;
+    }
+
+    function isOptionalString(value, maxLen) {
+      return value == null || isValidString(value, maxLen);
+    }
+
+    function isValidCategoryId(categoryId) {
+      return categoryId in [
+        'emotions', 'behaviors', 'sleep', 'food', 'medication',
+        'school', 'communication', 'sensory', 'achievements', 'observations'
+      ];
+    }
+
+    function isValidIntensity(intensity) {
+      return intensity == null || intensity in ['low', 'medium', 'high'];
+    }
+
+    // ------------------------------------------------------------------
+    // users/{uid} — perfil próprio, nunca contém papéis de confiança
+    // ------------------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isSignedIn() && (uid() == userId || isAdmin());
+      allow list: if false;
+      allow create: if isSignedIn() && uid() == userId
+        && request.resource.data.uid == userId
+        && isValidString(request.resource.data.displayName, 120)
+        && !('admin' in request.resource.data)
+        && !('familyId' in request.resource.data);
+      allow update: if isSignedIn() && uid() == userId
+        && request.resource.data.uid == resource.data.uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['admin', 'uid', 'familyId']);
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // families — estrutura e associação de membros geridas só por Cloud
+    // Functions (createFamily, inviteFamilyMember, acceptFamilyInvite,
+    // removeFamilyMember). O cliente nunca escreve aqui diretamente: isto
+    // elimina qualquer possibilidade de um utilizador se auto-atribuir um
+    // papel ou entrar numa família alheia através de uma escrita direta.
+    // ------------------------------------------------------------------
+    match /families/{familyId} {
+      allow get: if isFamilyMember(familyId) || isAdmin();
+      allow list: if false;
+      allow write: if false;
+
+      match /members/{memberId} {
+        allow get: if isFamilyMember(familyId) || isAdmin();
+        allow list: if isFamilyMember(familyId) || isAdmin();
+        allow write: if false;
+      }
+
+      match /invites/{inviteId} {
+        allow get: if isFamilyOwner(familyId) || isAdmin()
+          || resource.data.email == request.auth.token.email;
+        allow list: if isFamilyOwner(familyId) || isAdmin();
+        allow write: if false;
+      }
+
+      match /tags/{tagId} {
+        allow read: if isFamilyMember(familyId) || isAdmin();
+        allow create: if isFamilyMember(familyId)
+          && request.resource.data.familyId == familyId
+          && request.resource.data.createdBy == uid()
+          && isValidString(request.resource.data.label, 60);
+        allow update: if isFamilyMember(familyId)
+          && request.resource.data.familyId == resource.data.familyId
+          && request.resource.data.createdBy == resource.data.createdBy;
+        allow delete: if isFamilyMember(familyId);
+      }
+
+      match /consents/{consentId} {
+        allow read: if isFamilyMember(familyId) || isAdmin();
+        allow create: if isFamilyOwner(familyId)
+          && request.resource.data.familyId == familyId
+          && request.resource.data.grantedBy == uid();
+        allow update: if isFamilyOwner(familyId)
+          && request.resource.data.familyId == resource.data.familyId
+          // só se pode alterar o estado de revogação, nunca o registo original
+          && request.resource.data.grantedBy == resource.data.grantedBy
+          && request.resource.data.grantedAt == resource.data.grantedAt;
+        allow delete: if false;
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // children — perfil da criança. Criação/edição pela família dona;
+    // exclusão é sempre lógica (deletedAt), nunca física.
+    // ------------------------------------------------------------------
+    match /children/{childId} {
+      allow get: if canViewChild(childId);
+      allow list: if isFamilyMember(resource.data.familyId) || isAdmin();
+
+      allow create: if isFamilyMember(request.resource.data.familyId)
+        && request.resource.data.createdBy == uid()
+        && request.resource.data.deletedAt == null
+        && isValidString(request.resource.data.name, 120)
+        && request.resource.data.relationshipOrigin in ['ode', 'partner', 'direct'];
+
+      allow update: if isChildFamilyMember(childId)
+        && request.resource.data.familyId == resource.data.familyId
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.updatedBy == uid()
+        && isValidString(request.resource.data.name, 120);
+
+      allow delete: if false;
+
+      // -- registos quotidianos --------------------------------------
+      match /records/{recordId} {
+        // "read" cobre get() e list(): a MESMA condição, por categoria do
+        // próprio documento, é aplicada a cada documento candidato de uma
+        // consulta — impede que um colaborador com acesso de visualização
+        // mas sem escopo de "medication" veja esses registos ao listar.
+        allow read: if canViewCategory(childId, resource.data.categoryId);
+
+        allow create: if canRegisterCategory(childId, request.resource.data.categoryId)
+          && request.resource.data.childId == childId
+          && request.resource.data.familyId == childData(childId).familyId
+          && request.resource.data.createdBy == uid()
+          && request.resource.data.version == 1
+          && request.resource.data.deletedAt == null
+          && isValidCategoryId(request.resource.data.categoryId)
+          && isValidIntensity(request.resource.data.intensity)
+          && isOptionalString(request.resource.data.notes, 4000)
+          && isOptionalString(request.resource.data.where, 200)
+          && isOptionalString(request.resource.data.withWhom, 200)
+          && isOptionalString(request.resource.data.antecedent, 500)
+          && isOptionalString(request.resource.data.behavior, 500)
+          && isOptionalString(request.resource.data.regulation, 500)
+          && isOptionalString(request.resource.data.helper, 200)
+          && isOptionalString(request.resource.data.outcome, 500)
+          && request.resource.data.occurredAt is timestamp
+          && request.resource.data.source in ['family', 'school', 'professional', 'other'];
+
+        // Edição: mantém autor e criança, exige incremento de versão. O
+        // histórico da versão anterior é gravado à parte (subcoleção
+        // history), imutável.
+        allow update: if (isChildFamilyMember(childId) || grantHasCapability(childId, 'register'))
+          && canRegisterCategory(childId, resource.data.categoryId)
+          && request.resource.data.childId == resource.data.childId
+          && request.resource.data.familyId == resource.data.familyId
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.categoryId == resource.data.categoryId
+          && request.resource.data.updatedBy == uid()
+          && request.resource.data.version == resource.data.version + 1
+          && isOptionalString(request.resource.data.notes, 4000);
+
+        allow delete: if false; // exclusão é sempre lógica (update de deletedAt)
+
+        match /history/{historyId} {
+          allow read: if canViewCategory(childId, get(/databases/$(database)/documents/children/$(childId)/records/$(recordId)).data.categoryId);
+          allow create: if isChildFamilyMember(childId) || grantHasCapability(childId, 'register');
+          allow update: if false;
+          allow delete: if false;
+        }
+      }
+
+      // -- medicamentos cadastrados: só a família tem acesso de escrita;
+      //    leitura de terceiros exige escopo explícito 'medication' -------
+      match /medications/{medicationId} {
+        allow get: if isChildFamilyMember(childId)
+          || (grantHasCapability(childId, 'view') && grantCoversCategory(childId, 'medication'));
+        allow list: if isChildFamilyMember(childId)
+          || (grantHasCapability(childId, 'view') && grantCoversCategory(childId, 'medication'));
+        allow create: if isChildFamilyMember(childId)
+          && request.resource.data.childId == childId
+          && request.resource.data.createdBy == uid()
+          && isValidString(request.resource.data.name, 120);
+        allow update: if isChildFamilyMember(childId)
+          && request.resource.data.childId == resource.data.childId
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.updatedBy == uid();
+        allow delete: if false;
+      }
+
+      // -- consentimentos específicos da criança (ex.: partilha com escola) --
+      match /consents/{consentId} {
+        allow read: if isChildFamilyMember(childId) || isAdmin();
+        allow create: if isChildFamilyOwner(childId)
+          && request.resource.data.childId == childId
+          && request.resource.data.grantedBy == uid();
+        allow update: if isChildFamilyOwner(childId)
+          && request.resource.data.childId == resource.data.childId
+          && request.resource.data.grantedAt == resource.data.grantedAt;
+        allow delete: if false;
+      }
+
+      // -- cofre de documentos (Etapa 3) ------------------------------
+      // O cliente só pode criar o registo inicial ("selected") e marcar
+      // eliminação lógica. A transição para "uploading" (que reserva a
+      // URL assinada de envio) e TODAS as transições do pipeline
+      // (quarantine, scanning, extracting, pending_review, approved,
+      // rejected, error) são escritas exclusivamente por Cloud Functions
+      // (Admin SDK, que ignora estas regras) — ver getDocumentUploadUrl
+      // em functions/src/documents.js. O cliente nunca escreve
+      // diretamente no bucket nem avança, sozinho, o estado do
+      // documento.
+      match /documents/{documentId} {
+        allow get: if canViewCategory(childId, 'documents');
+        allow list: if isChildFamilyMember(childId)
+          || (grantHasCapability(childId, 'view') && grantCoversCategory(childId, 'documents'));
+
+        allow create: if isChildFamilyMember(childId)
+          && request.resource.data.childId == childId
+          && request.resource.data.familyId == childData(childId).familyId
+          && request.resource.data.createdBy == uid()
+          && request.resource.data.status == 'selected'
+          && request.resource.data.currentVersion == 0
+          && request.resource.data.deletedAt == null
+          && isValidString(request.resource.data.docType, 60)
+          && isOptionalString(request.resource.data.issuer, 200)
+          && isOptionalString(request.resource.data.specialty, 200)
+          && request.resource.data.origin in ['family', 'school', 'professional'];
+
+        // O único caso em que o CLIENTE atualiza este documento
+        // diretamente é para marcar eliminação lógica — tudo o resto
+        // (incluir a transição para "uploading") é feito pela Cloud
+        // Function getDocumentUploadUrl, via Admin SDK.
+        allow update: if isChildFamilyMember(childId)
+          && request.resource.data.childId == resource.data.childId
+          && request.resource.data.familyId == resource.data.familyId
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.deletedAt != null
+          && resource.data.deletedAt == null;
+
+        allow delete: if false;
+
+        match /versions/{versionId} {
+          allow read: if canViewCategory(childId, 'documents');
+          allow write: if false; // só a Cloud Function de validação regista versões
+        }
+
+        match /extractionItems/{itemId} {
+          allow read: if canViewCategory(childId, 'documents');
+          allow create: if false; // só a Cloud Function de extração cria itens
+          // Revisão humana: o responsável só pode alterar o veredito e o
+          // valor corrigido, nunca a categoria, página, excerto, confiança
+          // ou documento de origem que a extração produziu.
+          allow update: if isChildFamilyOwner(childId)
+            && request.resource.data.category == resource.data.category
+            && request.resource.data.page == resource.data.page
+            && request.resource.data.excerpt == resource.data.excerpt
+            && request.resource.data.confidence == resource.data.confidence
+            && request.resource.data.sourceVersionId == resource.data.sourceVersionId
+            && request.resource.data.reviewStatus in ['confirmed', 'edited', 'rejected']
+            && request.resource.data.reviewedBy == uid();
+          allow delete: if false;
+        }
+      }
+
+      // -- registo mínimo de perguntas feitas à IA sobre os documentos
+      //    (Etapa 3). Só metadados técnicos (quem, quando, que documentos
+      //    foram citados) — nunca a pergunta nem a resposta em texto
+      //    completo. Ver docs/logging-policy.md. Escrita só pela Cloud
+      //    Function do gateway de IA.
+      match /aiQueries/{queryId} {
+        allow read: if isChildFamilyMember(childId) || isAdmin();
+        allow write: if false;
+      }
+
+      // -- concessões de acesso (escola/profissional): geridas só por
+      //    Cloud Functions (createAccessGrant, acceptAccessGrant,
+      //    revokeAccessGrant). Leitura para transparência da família e do
+      //    próprio concessionário. --------------------------------------
+      match /accessGrants/{grantId} {
+        allow get: if isChildFamilyMember(childId) || isAdmin()
+          || resource.data.granteeUid == uid();
+        allow list: if isChildFamilyMember(childId) || isAdmin();
+        allow write: if false;
+      }
+
+      // -- índice de acesso "achatado": só a Cloud Function escreve -------
+      match /accessIndex/{granteeUid} {
+        allow get: if isChildFamilyOwner(childId) || isAdmin() || granteeUid == uid();
+        // collectionGroup query usada pelo colaborador para descobrir a que
+        // crianças tem acesso — restrita ao seu próprio uid (ver
+        // docs/data-model.md, "descoberta de acesso").
+        allow list: if isChildFamilyOwner(childId) || isAdmin();
+        allow write: if false;
+      }
+    }
+
+    // Query de grupo de coleção usada para "a que crianças tenho acesso
+    // concedido" — cada documento só é devolvido se pertencer ao próprio
+    // utilizador autenticado.
+    match /{path=**}/accessIndex/{granteeUid} {
+      allow list: if isSignedIn() && granteeUid == uid();
+    }
+
+    // ------------------------------------------------------------------
+    // auditLog — nunca editável nem apagável pelo cliente. Escrito
+    // exclusivamente por Cloud Functions (Admin SDK, que ignora estas
+    // regras). Leitura: o proprietário da família correspondente (para
+    // transparência) ou o administrador técnico (metadados operacionais,
+    // nunca o conteúdo clínico em si).
+    // ------------------------------------------------------------------
+    match /auditLog/{eventId} {
+      allow get: if isAdmin()
+        || (resource.data.familyId != null && isFamilyOwner(resource.data.familyId));
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // Recusa por omissão: qualquer caminho não listado acima é negado.
+    // ------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,14 +1,17 @@
 /**
  * Camada de configuração do Firebase.
  *
- * IMPORTANTE (Etapa 1): este ficheiro define apenas a FORMA da configuração
- * a partir de variáveis de ambiente. Não inicializa nenhum serviço Firebase
- * (Authentication, Firestore, Storage, Functions, App Check) e não importa
- * o SDK do Firebase. A ligação real ao backend fica para uma etapa futura.
+ * Define a FORMA da configuração a partir de variáveis de ambiente. A
+ * inicialização real do SDK vive em src/firebase/app.js, que é o único
+ * outro ficheiro que lê estas funções — nenhum outro módulo deve aceder
+ * a `import.meta.env` diretamente para configuração do Firebase.
  *
  * Nunca coloque credenciais reais em código-fonte. Em desenvolvimento,
  * copie ".env.example" para ".env" (ignorado pelo git) e, em produção,
- * configure as variáveis de ambiente no painel do Netlify.
+ * configure as variáveis de ambiente no painel do Netlify. As chaves
+ * devolvidas aqui são a configuração pública do Firebase Web (não são
+ * segredos — ver docs/threat-model.md); segredos de servidor/IA nunca
+ * pertencem a este ficheiro nem a nenhum código do browser.
  */
 
 function readEnv(key, fallback = '') {

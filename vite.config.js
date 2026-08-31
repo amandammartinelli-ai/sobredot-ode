@@ -19,6 +19,9 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    include: ['tests/**/*.test.js']
+    // tests/rules/** precisa do Firebase Emulator Suite a correr e tem o
+    // seu próprio comando (npm run test:rules) — ver package.json e
+    // docs/firebase-setup.md.
+    include: ['tests/unit/**/*.test.js']
   }
 });

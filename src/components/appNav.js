@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { route: 'documents', icon: '📄', labelKey: 'nav.documents' },
   { route: 'insights', icon: '💡', labelKey: 'nav.insights' },
   { route: 'reports', icon: '📊', labelKey: 'nav.reports' },
+  { route: 'family', icon: '👪', labelKey: 'nav.family' },
   { route: 'profile', icon: '👤', labelKey: 'nav.profile' },
 ];
 

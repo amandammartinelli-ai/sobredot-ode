@@ -10,6 +10,9 @@ export function renderInsightsView() {
     h('div', { class: 'notice notice--info' }, [
       h('h2', { style: 'font-size:var(--font-size-md); margin-bottom:var(--space-2)' }, [t('insights.notActiveTitle')]),
       h('p', { style: 'margin:0' }, [t('insights.notActiveBody')]),
+      h('a', { href: '#/documents', class: 'btn btn--secondary', style: 'margin-top: var(--space-3); display:inline-flex' }, [
+        t('insights.goToDocuments'),
+      ]),
     ]),
   ]);
 }

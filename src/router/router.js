@@ -1,36 +1,64 @@
 import { mount, focusMainHeading } from '../utils/dom.js';
 import { renderAppNav } from '../components/appNav.js';
 import { isAuthenticated } from '../services/authService.js';
+import { findMyFamilyId } from '../services/familyService.js';
+import { setFamilyId } from '../state/appState.js';
 import { renderWelcomeView } from '../views/welcome/welcomeView.js';
+import { renderLoginView } from '../views/auth/loginView.js';
+import { renderSignupView } from '../views/auth/signupView.js';
+import { renderResetPasswordView } from '../views/auth/resetPasswordView.js';
+import { renderOnboardingView } from '../views/onboarding/onboardingView.js';
 import { renderDashboardView } from '../views/dashboard/dashboardView.js';
+import { renderChildProfileView } from '../views/children/childProfileView.js';
 import { renderRegisterView } from '../views/register/registerView.js';
 import { renderTimelineView } from '../views/timeline/timelineView.js';
 import { renderDocumentsView } from '../views/documents/documentsView.js';
+import { renderDocumentDetailView } from '../views/documents/documentDetailView.js';
 import { renderInsightsView } from '../views/insights/insightsView.js';
 import { renderReportsView } from '../views/reports/reportsView.js';
+import { renderFamilyView } from '../views/family/familyView.js';
+import { renderAcceptInviteView } from '../views/family/acceptInviteView.js';
 import { renderProfileView } from '../views/profile/profileView.js';
 import { renderNotFoundView } from '../views/notFoundView.js';
+import { createLoadingState } from '../components/states/loadingState.js';
 
 /**
- * Router muito simples baseado em hash (#/rota). Foi escolhido por não
- * exigir configuração de redirecionamentos no servidor de alojamento —
- * ver docs/decisions.md para o registo desta decisão.
+ * Router muito simples baseado em hash (#/rota/param). Foi escolhido por
+ * não exigir configuração de redirecionamentos no servidor de alojamento
+ * — ver docs/decisions.md.
+ *
+ * `access`:
+ *  - 'public'      — qualquer pessoa, mesmo sem sessão
+ *  - 'auth'        — exige sessão iniciada (não exige família)
+ *  - 'family'      — exige sessão E família (onboarding concluído)
  */
 const routes = {
-  '': { view: renderWelcomeView, public: true, showChrome: false },
-  welcome: { view: renderWelcomeView, public: true, showChrome: false },
-  dashboard: { view: renderDashboardView, showChrome: true },
-  registar: { view: renderRegisterView, showChrome: true },
-  timeline: { view: renderTimelineView, showChrome: true },
-  documents: { view: renderDocumentsView, showChrome: true },
-  insights: { view: renderInsightsView, showChrome: true },
-  reports: { view: renderReportsView, showChrome: true },
-  profile: { view: renderProfileView, showChrome: true },
+  '': { view: renderWelcomeView, access: 'public', showChrome: false },
+  welcome: { view: renderWelcomeView, access: 'public', showChrome: false },
+  login: { view: renderLoginView, access: 'public', showChrome: false },
+  signup: { view: renderSignupView, access: 'public', showChrome: false },
+  'reset-password': { view: renderResetPasswordView, access: 'public', showChrome: false },
+  onboarding: { view: renderOnboardingView, access: 'auth', showChrome: false },
+  dashboard: { view: renderDashboardView, access: 'family', showChrome: true },
+  crianca: { view: renderChildProfileView, access: 'family', showChrome: true },
+  registar: { view: renderRegisterView, access: 'family', showChrome: true },
+  timeline: { view: renderTimelineView, access: 'family', showChrome: true },
+  documents: { view: renderDocumentsView, access: 'family', showChrome: true },
+  documento: { view: renderDocumentDetailView, access: 'family', showChrome: true },
+  insights: { view: renderInsightsView, access: 'family', showChrome: true },
+  reports: { view: renderReportsView, access: 'family', showChrome: true },
+  family: { view: renderFamilyView, access: 'family', showChrome: true },
+  'aceitar-convite': { view: renderAcceptInviteView, access: 'public', showChrome: false },
+  profile: { view: renderProfileView, access: 'family', showChrome: true },
 };
 
 function parseRoute() {
   const hash = window.location.hash.replace(/^#\/?/, '');
-  return hash.split('?')[0];
+  const [pathPart] = hash.split('?');
+  const segments = pathPart.split('/').filter(Boolean);
+  const routeName = segments[0] || '';
+  const params = segments.slice(1);
+  return { routeName, params };
 }
 
 function setChromeVisible(visible) {
@@ -42,12 +70,12 @@ function setChromeVisible(visible) {
   if (body) body.classList.toggle('app-shell', visible);
 }
 
-export function renderRoute({ moveFocus = true } = {}) {
+export async function renderRoute({ moveFocus = true } = {}) {
   const root = document.querySelector('[data-app-root]');
   if (!root) return;
 
-  const routeName = parseRoute();
-  const route = routes[routeName] || routes.notFound;
+  const { routeName, params } = parseRoute();
+  const route = routes[routeName];
 
   if (!route) {
     mount(root, renderNotFoundView());
@@ -56,9 +84,19 @@ export function renderRoute({ moveFocus = true } = {}) {
     return;
   }
 
-  if (!route.public && !isAuthenticated()) {
-    window.location.hash = '#/welcome';
+  if (route.access !== 'public' && !isAuthenticated()) {
+    window.location.hash = '#/login';
     return;
+  }
+
+  if (route.access === 'family') {
+    mount(root, createLoadingState());
+    const familyId = await findMyFamilyId();
+    if (!familyId) {
+      window.location.hash = '#/onboarding';
+      return;
+    }
+    setFamilyId(familyId);
   }
 
   setChromeVisible(Boolean(route.showChrome));
@@ -66,13 +104,13 @@ export function renderRoute({ moveFocus = true } = {}) {
     renderAppNav(routeName || 'dashboard');
   }
 
-  const node = route.view({ navigate });
+  const node = await route.view({ navigate, params });
   mount(root, node);
   if (moveFocus) focusMainHeading();
 }
 
-export function navigate(routeName) {
-  window.location.hash = `#/${routeName}`;
+export function navigate(routeName, ...params) {
+  window.location.hash = `#/${[routeName, ...params].join('/')}`;
 }
 
 /**

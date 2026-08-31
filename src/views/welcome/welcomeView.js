@@ -1,25 +1,23 @@
 import { h } from '../../utils/dom.js';
 import { t } from '../../i18n/index.js';
-import { enterDemoMode } from '../../services/authService.js';
 
 export function renderWelcomeView() {
   return h('div', { class: 'container view' }, [
     h('header', { class: 'view__header', style: 'text-align:center; padding-top: var(--space-8)' }, [
-      h('p', { style: 'color:var(--color-brand-500); font-weight:700; letter-spacing:.04em; text-transform:uppercase; font-size:var(--font-size-sm)' }, [
-        t('app.name'),
-      ]),
+      h(
+        'p',
+        {
+          style:
+            'color:var(--color-brand-500); font-weight:700; letter-spacing:.04em; text-transform:uppercase; font-size:var(--font-size-sm)',
+        },
+        [t('app.name')]
+      ),
       h('h1', {}, [t('welcome.title')]),
       h('p', { class: 'view__lead', style: 'margin-inline:auto' }, [t('welcome.subtitle')]),
-      h(
-        'a',
-        {
-          class: 'btn btn--primary',
-          href: '#/dashboard',
-          onClick: () => enterDemoMode(),
-          style: 'margin-top: var(--space-4)',
-        },
-        [t('welcome.ctaEnter')]
-      ),
+      h('div', { style: 'display:flex; gap:var(--space-3); justify-content:center; flex-wrap:wrap; margin-top: var(--space-4)' }, [
+        h('a', { class: 'btn btn--primary', href: '#/login' }, [t('welcome.ctaLogin')]),
+        h('a', { class: 'btn btn--secondary', href: '#/signup' }, [t('welcome.ctaSignup')]),
+      ]),
     ]),
 
     h('section', { class: 'notice notice--info', style: 'margin-top: var(--space-8)' }, [

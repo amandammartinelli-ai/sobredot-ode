@@ -25,3 +25,19 @@ yarn-error.log*
 
 # Cobertura de testes
 coverage/
+
+# Firebase Emulator Suite
+.emulator-data/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+storage-debug.log
+pubsub-debug.log
+database-debug.log
+extensions-debug.log
+.firebase/
+
+# Cloud Functions
+functions/node_modules/
+functions/.env
+functions/.env.local

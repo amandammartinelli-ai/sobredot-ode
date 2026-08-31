@@ -1,38 +1,101 @@
 /**
- * Serviço de autenticação — MODO DEMONSTRAÇÃO APENAS.
+ * Autenticação real via Firebase Authentication (e-mail/palavra-passe).
  *
- * Isto NÃO é autenticação real e não deve ser confundido com segurança.
- * Não existe palavra-passe, servidor, token ou verificação de identidade.
- * Serve apenas para simular, na interface, a existência de uma sessão,
- * de forma claramente identificada como demonstração. A ligação ao Firebase
- * Authentication ficará para uma etapa futura.
+ * Login social fica preparado mas não ativado nesta etapa (ver
+ * docs/firebase-setup.md, "Autenticação").
  */
-import { mockDemoUser } from '../data/mock/user.js';
-import { readJSON, writeJSON, remove } from './storageService.js';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  onAuthStateChanged,
+  updateProfile,
+} from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../firebase/app.js';
 
-const SESSION_KEY = 'demoSession';
+let currentUser = null;
+let authReadyResolve;
+const authReady = new Promise((resolve) => {
+  authReadyResolve = resolve;
+});
+const listeners = new Set();
 
-export function getCurrentUser() {
-  return readJSON(SESSION_KEY, null);
-}
+onAuthStateChanged(auth, (user) => {
+  currentUser = user;
+  authReadyResolve();
+  listeners.forEach((listener) => listener(user));
+});
 
-export function isAuthenticated() {
-  return getCurrentUser() !== null;
+/**
+ * Resolve assim que o Firebase Auth determinar, pela primeira vez, se há
+ * ou não uma sessão persistida. O router espera por isto antes de decidir
+ * a rota inicial — sem isto, um recarregamento de página redirecionaria
+ * sempre para o login por breves instantes, mesmo com sessão válida.
+ */
+export function waitForAuthReady() {
+  return authReady;
 }
 
 /**
- * "Entra" no modo de demonstração. Não valida credenciais nenhumas.
+ * Regista um ouvinte de mudança de sessão. Devolve uma função para
+ * cancelar a subscrição. Chama o ouvinte imediatamente com o estado
+ * atual, mesmo que ainda não tenha sido determinado pelo Firebase.
  */
-export function enterDemoMode() {
-  const session = {
-    ...mockDemoUser,
-    demoMode: true,
-    startedAt: new Date().toISOString(),
-  };
-  writeJSON(SESSION_KEY, session);
-  return session;
+export function onAuthChange(listener) {
+  listeners.add(listener);
+  listener(currentUser);
+  return () => listeners.delete(listener);
 }
 
-export function exitDemoMode() {
-  remove(SESSION_KEY);
+export function getCurrentUser() {
+  return currentUser;
+}
+
+export function isAuthenticated() {
+  return currentUser !== null;
+}
+
+export function isEmailVerified() {
+  return Boolean(currentUser?.emailVerified);
+}
+
+export async function signUp({ email, password, displayName }) {
+  const credential = await createUserWithEmailAndPassword(auth, email, password);
+  if (displayName) {
+    await updateProfile(credential.user, { displayName });
+  }
+  await setDoc(
+    doc(db, `users/${credential.user.uid}`),
+    {
+      uid: credential.user.uid,
+      displayName: displayName || null,
+      email,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+  await sendEmailVerification(credential.user);
+  return credential.user;
+}
+
+export async function signIn({ email, password }) {
+  const credential = await signInWithEmailAndPassword(auth, email, password);
+  return credential.user;
+}
+
+export async function signOutUser() {
+  await signOut(auth);
+}
+
+export async function resendVerificationEmail() {
+  if (!currentUser) return;
+  await sendEmailVerification(currentUser);
+}
+
+export async function requestPasswordReset(email) {
+  await sendPasswordResetEmail(auth, email);
 }
