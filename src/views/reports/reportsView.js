@@ -68,7 +68,7 @@ export async function renderReportsView() {
   function renderBuilder() {
     const periodSelect = h(
       'select',
-      { class: 'select' },
+      { class: 'select', id: 'reports-period' },
       PERIOD_OPTIONS.map((opt) => h('option', { value: opt.value, selected: opt.value === periodKey || undefined }, [t(opt.labelKey)]))
     );
     periodSelect.addEventListener('change', () => {
@@ -109,7 +109,7 @@ export async function renderReportsView() {
 
     return h('section', { class: 'card', style: 'margin-bottom: var(--space-4)' }, [
       h('h2', { style: 'font-size:var(--font-size-md)' }, [t('reports.builderTitle')]),
-      h('div', { class: 'form-field' }, [h('label', {}, [t('reports.periodLabel')]), periodSelect]),
+      h('div', { class: 'form-field' }, [h('label', { for: 'reports-period' }, [t('reports.periodLabel')]), periodSelect]),
       h('div', { class: 'form-field' }, [
         h('span', { style: 'font-weight:var(--font-weight-medium)' }, [t('reports.modulesLabel')]),
         h('div', { class: 'checkbox-group' }, moduleChecks),

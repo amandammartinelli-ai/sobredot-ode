@@ -14,6 +14,8 @@ const documents = require('./src/documents');
 const ai = require('./src/ai');
 const insights = require('./src/insights');
 const reports = require('./src/reports');
+const dataRights = require('./src/dataRights');
+const adminDashboard = require('./src/adminDashboard');
 
 // Exportação explícita: só funções Cloud Functions reais (callables e
 // gatilhos). Utilitários puros (ex.: containsBlockedIntent,
@@ -36,9 +38,11 @@ module.exports = {
   // administração
   onUserCreate: adminClaims.onUserCreate,
   setAdminClaim: adminClaims.setAdminClaim,
+  logLoginEvent: adminClaims.logLoginEvent,
   // auditoria (gatilhos)
   onChildWrite: audit.onChildWrite,
   onRecordWrite: audit.onRecordWrite,
+  onDocumentMetaWrite: audit.onDocumentMetaWrite,
   // cofre de documentos
   onDocumentUpload: documents.onDocumentUpload,
   approveDocument: documents.approveDocument,
@@ -56,4 +60,13 @@ module.exports = {
   createReportShareLink: reports.createReportShareLink,
   revokeReportShareLink: reports.revokeReportShareLink,
   getSharedReport: reports.getSharedReport,
+  // direitos da família (Etapa 5)
+  exportFamilyData: dataRights.exportFamilyData,
+  setChildProcessingRestriction: dataRights.setChildProcessingRestriction,
+  requestFamilyDeletion: dataRights.requestFamilyDeletion,
+  cancelFamilyDeletion: dataRights.cancelFamilyDeletion,
+  processScheduledDeletions: dataRights.processScheduledDeletions,
+  purgeOldTechnicalLogs: dataRights.purgeOldTechnicalLogs,
+  // painel administrativo (Etapa 5)
+  getOperationalSummary: adminDashboard.getOperationalSummary,
 };

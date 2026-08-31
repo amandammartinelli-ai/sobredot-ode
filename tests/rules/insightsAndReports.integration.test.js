@@ -7,7 +7,7 @@
 // Emulator completo, mas exercita exatamente a mesma lógica que as Cloud
 // Functions implantadas usam.
 import { beforeEach, describe, it, expect } from 'vitest';
-import { admin, db } from '../../functions/src/init.js';
+import { db, Timestamp } from '../../functions/src/init.js';
 import {
   generateInsightsHandler,
   setInsightStatusHandler,
@@ -20,8 +20,6 @@ import {
   getSharedReportHandler,
 } from '../../functions/src/reports.js';
 import { resolvePeriod } from '../../functions/src/metrics.js';
-
-const { Timestamp } = admin.firestore;
 
 beforeEach(async () => {
   for (const name of ['families', 'children']) {

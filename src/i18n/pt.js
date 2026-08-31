@@ -87,9 +87,12 @@ export default {
       'auth/invalid-email': 'E-mail inválido.',
       'auth/email-already-in-use': 'Já existe uma conta com este e-mail.',
       'auth/weak-password': 'A palavra-passe é demasiado fraca (mínimo 8 caracteres).',
-      'auth/wrong-password': 'Palavra-passe incorreta.',
+      // Nunca distinguir "palavra-passe errada" de "conta não existe" — ver
+      // docs/threat-model.md, risco de enumeração de contas. As três
+      // partilham deliberadamente a mesma mensagem genérica.
+      'auth/wrong-password': 'E-mail ou palavra-passe incorretos.',
       'auth/invalid-credential': 'E-mail ou palavra-passe incorretos.',
-      'auth/user-not-found': 'Não existe nenhuma conta com este e-mail.',
+      'auth/user-not-found': 'E-mail ou palavra-passe incorretos.',
       'auth/too-many-requests': 'Demasiadas tentativas. Tente novamente mais tarde.',
       passwordMismatch: 'As palavras-passe não coincidem.',
       generic: 'Não foi possível completar o pedido. Tente novamente.',
@@ -121,6 +124,11 @@ export default {
     deleteConfirmTitle: 'Remover esta criança?',
     deleteConfirmBody:
       'O perfil deixa de aparecer na aplicação. Os registos existentes não são apagados imediatamente — ver Perfil → Privacidade.',
+    dangerZoneTitle: 'Remover esta criança',
+    processingRestrictionTitle: 'Restringir processamento de IA',
+    processingRestrictionHint:
+      'Quando ativo, o gateway de IA e a Visão Integrada deixam de processar esta criança. Os registos e documentos continuam normalmente acessíveis — só a análise automática é pausada.',
+    processingRestrictionLabel: 'Restringir processamento de IA para esta criança',
   },
 
   family: {
@@ -178,6 +186,17 @@ export default {
     sectionAudit: 'Histórico de atividade',
     sectionAuditHint: 'Ações relevantes registadas automaticamente pelo servidor — este histórico não pode ser alterado.',
     noAuditEvents: 'Ainda não há eventos registados.',
+
+    deletionTitle: 'Eliminar esta família',
+    deletionHint:
+      'Elimina permanentemente todos os dados da família na Sobredot (crianças, registos, documentos, insights, metas) 14 dias depois do pedido — pode cancelar a qualquer momento antes disso. As contas de acesso dos membros não são eliminadas, só deixam de estar associadas a esta família.',
+    deletionConfirmLabelPrefix: 'Escreva exatamente o nome da família para confirmar:',
+    deletionCta: 'Pedir eliminação da família',
+    deletionConfirmDialogTitle: 'Tem a certeza?',
+    deletionConfirmDialogBody:
+      'Isto agenda a eliminação definitiva de todos os dados desta família dentro de 14 dias. Pode cancelar a qualquer momento antes do prazo.',
+    deletionPendingBody: 'Eliminação agendada para',
+    deletionCancelCta: 'Cancelar pedido de eliminação',
   },
 
   dashboard: {
@@ -563,6 +582,47 @@ export default {
     goToFamily: 'Gerir família, acessos e consentimentos',
     privacyNote:
       'Os seus dados estão protegidos por autenticação, controlo de acesso e regras de segurança do servidor. Pode gerir consentimentos e acessos em Família.',
+    exportDataCta: 'Exportar os meus dados',
+    exportDataHint:
+      'Descarrega um ficheiro .json com uma cópia estruturada de tudo o que a sua família tem guardado (não inclui os ficheiros dos documentos — descarregue-os individualmente em Documentos).',
+    exportingLabel: 'A preparar exportação…',
+    exportDoneAnnounce: 'Exportação descarregada.',
+  },
+
+  admin: {
+    title: 'Painel administrativo',
+    subtitle: 'Saúde operacional agregada — nunca conteúdo de família ou de criança.',
+    deniedTitle: 'Sem acesso',
+    deniedBody: 'Esta área é só para administradores técnicos.',
+    refreshCta: 'Atualizar',
+    generatedAtLabel: 'Calculado às',
+    sectionFamilies: 'Famílias',
+    familiesTotal: 'Total de famílias',
+    familiesPendingDeletions: 'Eliminações pendentes',
+    sectionChildren: 'Crianças',
+    childrenActive: 'Crianças ativas',
+    childrenProcessingRestricted: 'Com IA restringida',
+    sectionDocuments: 'Documentos por estado',
+    sectionAiQueries: 'IA — Perguntar aos documentos (últimas 24h)',
+    aiQueriesTotal: 'Perguntas',
+    aiQueriesBlocked: 'Bloqueadas',
+    aiQueriesEmergency: 'Emergência detetada',
+    sectionAbuse: 'Anti-abuso (últimas 24h)',
+    abuseRateLimited: 'Pedidos recusados por limite',
+    sectionVersions: 'Versões em produção',
+    versionFrontend: 'Frontend',
+    versionFunctions: 'Cloud Functions',
+    sectionIncidents: 'Incidentes',
+    incidentsEmpty: 'Nenhum incidente registado.',
+    incidentTitleLabel: 'Título',
+    incidentSeverityLabel: 'Gravidade',
+    incidentSeverityLow: 'Baixa',
+    incidentSeverityMedium: 'Média',
+    incidentSeverityHigh: 'Alta',
+    incidentCreateCta: 'Registar incidente',
+    incidentResolveCta: 'Marcar como resolvido',
+    incidentStatusOpen: 'Aberto',
+    incidentStatusResolved: 'Resolvido',
   },
 
   states: {

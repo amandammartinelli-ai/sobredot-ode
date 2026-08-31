@@ -1,7 +1,8 @@
 # Configuração de deploy do frontend Sobredot no Netlify.
-# A navegação usa router baseado em hash (#/rota), pelo que não é necessário
-# nenhum redirecionamento de SPA para servir index.html em caminhos profundos.
-# Ver docs/decisions.md para o registo desta decisão.
+# A navegação usa router baseado em hash (#/rota) — o fragmento nunca é
+# enviado ao servidor, por isso a própria navegação dentro da aplicação
+# nunca pede um caminho profundo ao Netlify. Ver docs/decisions.md para o
+# registo desta decisão.
 
 [build]
   command = "npm run build"
@@ -10,13 +11,24 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Content-Security-Policy (Etapa 5 — ver docs/security-hardening.md):
+# construída para o SDK modular do Firebase (Auth, Firestore, Storage,
+# Functions, App Check) e reCAPTCHA v3 (App Check). Nenhum script/estilo
+# inline é usado no HTML (só o módulo ES em /src/main.js), pelo que
+# script-src fica estrito, sem 'unsafe-inline' nem 'unsafe-eval'.
+# style-src precisa de 'unsafe-inline' porque os componentes usam o
+# atributo `style="..."` diretamente (ver src/utils/dom.js) — um
+# refactor para remover isto fica para uma etapa futura (ver
+# docs/security-hardening.md, "Aceite conscientemente").
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://www.gstatic.com https://www.google.com https://www.recaptcha.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.gstatic.com; font-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.google.com https://*.cloudfunctions.net https://*.run.app; frame-src https://www.google.com https://www.recaptcha.net; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
 
 [[headers]]
   for = "/assets/*"
@@ -28,3 +40,14 @@
 
 [context.branch-deploy]
   command = "npm run build"
+
+# Um utilizador pode ainda assim chegar a um caminho que não é um ficheiro
+# real (link partilhado antigo, erro de digitação, motor de busca) — sem
+# isto, o Netlify devolveria a sua página de erro genérica em vez da
+# aplicação. Isto serve sempre index.html (com estado HTTP 404, para não
+# enganar motores de busca) e deixa o router da aplicação decidir o que
+# mostrar a seguir — ver docs/deploy-netlify.md, "Páginas de erro/404".
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 404

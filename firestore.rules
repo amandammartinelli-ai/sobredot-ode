@@ -230,11 +230,17 @@ service cloud.firestore {
         && isValidString(request.resource.data.name, 120)
         && request.resource.data.relationshipOrigin in ['ode', 'partner', 'direct'];
 
+      // A restrição de processamento de IA (Etapa 5) só pode ser
+      // alterada pela Cloud Function `setChildProcessingRestriction`
+      // (que audita a ação) — nunca por uma escrita direta do cliente,
+      // mesmo que inofensiva em termos de privilégio.
       allow update: if isChildFamilyMember(childId)
         && request.resource.data.familyId == resource.data.familyId
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.updatedBy == uid()
-        && isValidString(request.resource.data.name, 120);
+        && isValidString(request.resource.data.name, 120)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['processingRestricted', 'processingRestrictedAt', 'processingRestrictedBy']);
 
       allow delete: if false;
 
@@ -479,6 +485,17 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------------------
+    // rateLimits — contadores internos de anti-abuso (Etapa 5). Nunca
+    // lidos nem escritos pelo cliente; só as próprias Cloud Functions
+    // (Admin SDK) os consultam antes de processar um pedido caro. Não
+    // têm nenhum conteúdo sensível — só um contador e uma janela
+    // temporal por chave interna.
+    // ------------------------------------------------------------------
+    match /rateLimits/{key} {
+      allow read, write: if false;
+    }
+
+    // ------------------------------------------------------------------
     // auditLog — nunca editável nem apagável pelo cliente. Escrito
     // exclusivamente por Cloud Functions (Admin SDK, que ignora estas
     // regras). Leitura: o proprietário da família correspondente (para
@@ -486,10 +503,27 @@ service cloud.firestore {
     // nunca o conteúdo clínico em si).
     // ------------------------------------------------------------------
     match /auditLog/{eventId} {
-      allow get: if isAdmin()
+      // "list" tem de ser tão permissivo quanto "get" para que a família
+      // consiga efetivamente listar o seu próprio histórico
+      // (query com where('familyId','==', X) — ver
+      // src/services/auditService.js). Provavelmente seguro: para
+      // qualquer documento devolvido por essa consulta,
+      // resource.data.familyId é sempre X, o mesmo valor que a regra
+      // exige pertencer à família do pedinte.
+      allow get, list: if isAdmin()
         || (resource.data.familyId != null && isFamilyOwner(resource.data.familyId));
-      allow list: if isAdmin();
       allow write: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // incidents — registo manual de incidentes operacionais para o
+    // painel administrativo (Etapa 5, docs/admin-dashboard.md). Nunca
+    // conteúdo de família/criança — só título, gravidade, estado e
+    // datas, escritos pelo próprio administrador. Só administradores
+    // têm sequer conhecimento de que esta coleção existe.
+    // ------------------------------------------------------------------
+    match /incidents/{incidentId} {
+      allow read, write: if isAdmin();
     }
 
     // ------------------------------------------------------------------

@@ -203,14 +203,154 @@ expirados, com mensagens distintas. O token não deriva de nenhum dado
 pessoal. Testado com token errado, link revogado e link expirado
 (`tests/rules/insightsAndReports.integration.test.js`).
 
+## Etapa 5 — revisão sistemática com STRIDE
+
+As etapas anteriores já cobriam riscos concretos à medida que cada
+funcionalidade foi construída (riscos 1–13 acima). Nesta etapa, antes de
+considerar a aplicação candidata a um piloto controlado, aplicou-se
+[STRIDE](https://learn.microsoft.com/en-us/azure/security/develop/threat-modeling-tool-threats)
+(Spoofing, Tampering, Repudiation, Information Disclosure, Denial of
+Service, Elevation of Privilege) de forma sistemática, para confirmar
+que cada categoria tem pelo menos uma mitigação identificada — e para
+cobrir explicitamente a lista de preocupações exigida antes de um
+piloto: conta comprometida, enumeração, acesso entre famílias, upload
+malicioso, prompt injection, exfiltração via modelo, links partilhados,
+abuso administrativo, logs, backups e dependências.
+
+| Categoria STRIDE | Onde se aplica na Sobredot | Mitigação / referência |
+|---|---|---|
+| **S**poofing (falsificação de identidade) | Conta comprometida (risco 14); token de partilha de relatório (risco 13) | Firebase Auth + regras server-side; token opaco SHA-256, comparação timing-safe |
+| **T**ampering (alteração indevida) | Insight editado por profissional (risco 12); registo alterado sem histórico | `setInsightStatus` só altera `status`; histórico imutável de registos (`.../history`) |
+| **R**epudiation (negar uma ação) | Ninguém conseguir provar quem fez o quê | `auditLog` imutável (nunca editável/apagável pelo cliente — ver `docs/logging-policy.md`) |
+| **I**nformation Disclosure (fuga de informação) | Acesso entre famílias (risco 7); prompt injection (risco 8); exfiltração via IA (risco 17); logs com conteúdo (risco 18) | Isolamento por regras testado; `sanitizeUntrustedText`; nunca conteúdo em log (`docs/logging-policy.md`) |
+| **D**enial of Service (negação de serviço) | Abuso do gateway de IA/quotas | `functions/src/rateLimit.js` — falha segura, nunca processamento parcial (ver `docs/security-hardening.md`) |
+| **E**levation of Privilege (elevação de privilégio) | Autopromoção a administrador; abuso administrativo (risco 10) | `setAdminClaim` só chamável por outro administrador; `isAdmin()` nunca dá acesso a conteúdo sensível |
+
+As subsecções seguintes cobrem os itens da lista que ainda não tinham um
+risco dedicado.
+
+### 14. Conta comprometida (credenciais reutilizadas, sessão roubada)
+**Risco:** um terceiro obtém a palavra-passe de um cuidador (reutilizada
+de outro serviço, phishing) ou rouba uma sessão ativa, e passa a agir
+como esse cuidador — dentro do âmbito legítimo da conta, por isso
+invisível a qualquer controlo de autorização.
+**Mitigação implementada:** Firebase Authentication gere sessões e
+hashing de palavras-passe (nunca visto pela aplicação); `auth.login` é
+registado em auditoria (Etapa 5, "melhor esforço", ver
+`docs/security-hardening.md`) para dar à família visibilidade sobre
+início de sessão; a exigência de confirmação de e-mail
+(`isEmailVerified`) reduz contas descartáveis.
+**Pendência real, não coberta ainda:** não há autenticação
+multifator (MFA) nem deteção de início de sessão a partir de um
+dispositivo/localização invulgar — nenhuma das duas é trivial de
+implementar sem um fornecedor dedicado. Recomendação para antes de
+alargar o piloto (`docs/pilot-plan.md`, portão 3): avaliar MFA opcional
+do Firebase Auth.
+
+### 15. Enumeração de contas (resolvido nesta etapa)
+**Risco:** mensagens de erro de login distintas para "e-mail não existe"
+vs. "palavra-passe errada" permitem a um atacante descobrir que e-mails
+têm conta na Sobredot, sem sequer tentar entrar.
+**Mitigação implementada e testada:** as três mensagens de erro
+relevantes (`auth/user-not-found`, `auth/wrong-password`,
+`auth/invalid-credential`) foram unificadas na mesma frase genérica
+(`src/i18n/pt.js`) — ver `docs/security-hardening.md`, secção 1, para o
+registo desta correção (era uma falha real, não hipotética, presente
+desde o início da autenticação real).
+
+### 16. Upload malicioso de documentos
+**Risco:** um ficheiro carregado como "documento" ser na realidade
+desenhado para explorar o sistema — tipo de ficheiro disfarçado,
+tamanho desproporcional (negação de serviço no processamento), ou um
+número de páginas concebido para esgotar recursos.
+**Mitigação implementada e testada:**
+- Limite de tamanho (20 MB, `MAX_BYTES`) verificado tanto na emissão do
+  URL de upload como na receção do ficheiro.
+- Limite de páginas (200, `MAX_PAGES`) — um documento acima disso é
+  rejeitado explicitamente, nunca processado parcialmente em silêncio.
+- O tipo declarado pelo cliente nunca é a fonte de verdade: o conteúdo
+  real é analisado por assinatura de ficheiro (`functions/src/
+  contentSniff.js`, testado em `functions/test/contentSniff.test.js`) e
+  comparado com o tipo declarado — uma incompatibilidade é rejeitada.
+- Um documento sem antivírus real configurado fica preso em quarentena
+  em vez de avançar (risco 9) — nunca um falso sentido de segurança.
+- No máximo 3 tentativas de processamento por documento (`MAX_ATTEMPTS`)
+  — um ficheiro que cause falhas repetidas fica em erro definitivo, não
+  em ciclo infinito.
+
+### 17. Exfiltração de dados de outra criança através do gateway de IA
+**Risco:** distinto do risco 8 (documento a tentar instruir a IA) — aqui
+é a própria PESSOA a formular perguntas desenhadas para extrair, por
+inferência ou repetição, informação de uma criança diferente da que tem
+acesso (ex.: perguntar sistematicamente sobre "outras crianças
+parecidas" na esperança de a resposta vazar algo).
+**Mitigação implementada e testada:** a recuperação de contexto
+(`retrieveChildContext`) só pode fisicamente aceder à subcoleção da
+criança pedida — não há nenhum caminho de código em que o gateway
+consulte outra criança, independentemente da pergunta feita; não há
+"memória" partilhada entre pedidos de crianças diferentes. Testado
+explicitamente pelo teste canário (`tests/rules/
+aiRetrieval.canary.test.js`) e pela suite de avaliação de segurança
+(`tests/rules/aiSafetyEvals.integration.test.js`, caso "fuga entre
+crianças"). O limite de utilização por criança e por utilizador
+(`docs/security-hardening.md`) também torna uma tentativa de extração
+por repetição sistemática mais lenta e visível (via o painel
+administrativo, `abuse.rate_limited`).
+
+### 18. Logs e auditoria como via de fuga de dados
+**Risco:** um sistema de logging que pareça "só técnico" acabar por
+conter, na prática, conteúdo sensível (texto de um registo, de um
+documento, de uma pergunta de IA) — o log tornar-se, sem se perceber, um
+segundo repositório de dados sensíveis, sem o mesmo controlo de acesso.
+**Mitigação implementada e testada:** `docs/logging-policy.md` é o
+contrato explícito do que pode e não pode entrar em qualquer log/evento
+de auditoria/notificação — nunca conteúdo, só metadados técnicos.
+Aplicado consistentemente em `writeAuditEvent` (chamado sempre com
+`metadata` explícito, nunca o objeto de dados completo) e em
+`logAiQuery` (nunca a pergunta nem a resposta). O painel administrativo
+(`docs/admin-dashboard.md`) reforça o mesmo princípio ao nível da
+interface — só números agregados.
+
+### 19. Backups e continuidade
+**Risco:** perda de dados por eliminação acidental em massa, corrupção,
+ou uma falha de infraestrutura do próprio fornecedor — sem cópia de
+segurança recuperável.
+**Estado atual:** nenhum backup automático está configurado nesta etapa
+(nenhum projeto Firebase de produção existe ainda). Ver
+`docs/runbooks/backup-restore.md` para o que tem de ser ativado antes de
+dados reais, e como testar uma restauração — isto é um **critério de
+bloqueio do lançamento** (`docs/pilot-plan.md`): backups configurados
+sem um restauro alguma vez testado equivalem, na prática, a não ter
+backup.
+
+### 20. Dependências de terceiros (cadeia de fornecimento de software)
+**Risco:** uma vulnerabilidade numa biblioteca de terceiros (frontend,
+Cloud Functions, ou ferramentas de build) ser explorada antes de ser
+corrigida.
+**Mitigação implementada:** `.github/dependabot.yml` (Etapa 5) mantém
+as dependências de `package.json` (raiz e `functions/`) e as GitHub
+Actions atualizadas semanalmente, com PRs automáticos passando pelo
+mesmo CI que qualquer outra alteração (`.github/workflows/ci.yml`). Ver
+`docs/runbooks/vulnerability-response.md` para o processo quando uma
+vulnerabilidade é reportada fora do ciclo normal do Dependabot (ex.: um
+aviso de segurança urgente).
+**Nota de transparência:** uma verificação `npm audit` durante esta
+etapa encontrou uma vulnerabilidade conhecida, profunda em dependências
+transitivas do SDK de armazenamento do Firebase, sem exploração prática
+conhecida no nosso padrão de uso — decidido não forçar uma atualização
+de versão principal só para a "resolver" no papel (ver
+`docs/security-hardening.md` e `docs/decisions.md` para o registo desta
+decisão e da tentativa revertida de atualizar `firebase-admin`).
+
 ## Perguntas em aberto para etapas futuras
 
 - Como é revogado, na prática, o consentimento de partilha com a escola ou
   com a ODE, depois de já ter sido concedido? (mecanismo já existe —
   `revokeChildConsent` — falta lapidar o fluxo de notificação a quem foi
   afetado.)
-- Como é feita a exportação/eliminação completa de dados a pedido do
-  titular (direitos RGPD), incluindo objetos já purgados do Storage?
+- ~~Como é feita a exportação/eliminação completa de dados a pedido do
+  titular (direitos RGPD), incluindo objetos já purgados do Storage?~~
+  **Resolvido na Etapa 5** — ver `docs/governance/data-rights.md`.
 - Qual o modelo de partilha entre múltiplos cuidadores da mesma criança
   em agregados separados (ver decisão 11 em `docs/decisions.md` —
   atualmente uma família por utilizador)?
@@ -219,3 +359,5 @@ pessoal. Testado com token errado, link revogado e link expirado
 - Como validar de forma automatizada a geração de URLs assinadas de
   Storage num ambiente de CI com credenciais reais (não verificável no
   sandbox usado durante o desenvolvimento — ver `docs/firebase-setup.md`)?
+- Autenticação multifator (MFA) — ver risco 14: avaliar antes de
+  alargar o piloto além do grupo controlado inicial.

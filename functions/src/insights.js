@@ -20,13 +20,14 @@ const { regionalFunctions: functions, HttpsError } = require('./regional');
 const { db } = require('./init');
 const { FieldValue } = require('firebase-admin/firestore');
 const { writeAuditEvent } = require('./audit');
-const { containsBlockedIntent } = require('./ai');
+const { containsBlockedIntent, containsFalseCertaintyLanguage } = require('./ai');
 const {
   requireAuth,
   requireFamilyMembership,
   resolveChildAccess,
   getFamilyMember,
 } = require('./util');
+const { LIMITS, enforcePerUserAndChildLimit } = require('./rateLimit');
 const metrics = require('./metrics');
 const patterns = require('./patterns');
 
@@ -324,13 +325,14 @@ function buildInsightsForPeriod({ records, extractionItems, olderExtractionItems
   }
 
   // Defesa em profundidade: nenhum insight gerado pode conter linguagem
-  // causal indevida, um número não citável na evidência, ou conteúdo que
-  // pareça diagnóstico/prescrição — mesmo vindo de templates fixos.
+  // causal indevida, um número não citável na evidência, linguagem de
+  // falsa certeza, ou conteúdo que pareça diagnóstico/prescrição — mesmo
+  // vindo de templates fixos.
   return insights.map((insight) => {
     const text = `${insight.title} ${insight.factualObservation} ${insight.possiblePattern || ''}`;
     const causalViolations = assertNoCausalLanguage(text);
     const ungroundedNumbers = assertNumbersAreGrounded(text, insight.evidence);
-    const blocked = containsBlockedIntent(text);
+    const blocked = containsBlockedIntent(text) || containsFalseCertaintyLanguage(text);
     if (causalViolations.length > 0 || ungroundedNumbers.length > 0 || blocked) {
       return {
         ...insight,
@@ -407,6 +409,15 @@ async function generateInsightsHandler(data, uid) {
   }
   const child = childSnap.data();
   await requireFamilyMembership(child.familyId, uid);
+
+  if (child.processingRestricted) {
+    throw new HttpsError(
+      'failed-precondition',
+      'O processamento de IA para esta criança está restringido a pedido da família.'
+    );
+  }
+
+  await enforcePerUserAndChildLimit('generate_insights', uid, childId, LIMITS.INSIGHTS_PER_USER, LIMITS.INSIGHTS_PER_CHILD);
 
   let period;
   try {

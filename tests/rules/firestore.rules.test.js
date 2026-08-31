@@ -310,6 +310,23 @@ describe('Auditoria imutável pelo cliente', () => {
     await assertSucceeds(getDoc(doc(db, 'auditLog/audit-1')));
   });
 
+  it('o proprietário da família pode LISTAR (consultar) o histórico de auditoria da sua própria família', async () => {
+    // Regressão: "list" tinha ficado restrito só a administradores,
+    // mesmo "get" já permitindo ao proprietário — a consulta usada por
+    // src/services/auditService.js (listFamilyAuditEvents) falhava
+    // sempre, silenciosamente absorvida por um `.catch(() => [])` na
+    // interface. Ver docs/decisions.md.
+    const db = testEnv.authenticatedContext(OWNER_A).firestore();
+    const q = query(collection(db, 'auditLog'), where('familyId', '==', FAMILY_A));
+    await assertSucceeds(getDocs(q));
+  });
+
+  it('a família B não consegue listar o histórico de auditoria da família A', async () => {
+    const db = testEnv.authenticatedContext(OWNER_B).firestore();
+    const q = query(collection(db, 'auditLog'), where('familyId', '==', FAMILY_A));
+    await assertFails(getDocs(q));
+  });
+
   it('ninguém consegue apagar um registo de auditoria a partir do cliente', async () => {
     const db = testEnv.authenticatedContext(OWNER_A).firestore();
     await assertFails(deleteDoc(doc(db, 'auditLog/audit-1')));
@@ -318,5 +335,23 @@ describe('Auditoria imutável pelo cliente', () => {
   it('ninguém consegue alterar um registo de auditoria a partir do cliente', async () => {
     const db = testEnv.authenticatedContext(OWNER_A).firestore();
     await assertFails(updateDoc(doc(db, 'auditLog/audit-1'), { action: 'forjado' }));
+  });
+});
+
+describe('Painel administrativo — incidentes (Etapa 5)', () => {
+  it('um administrador técnico pode ler e escrever incidentes', async () => {
+    const db = testEnv.authenticatedContext('uid-admin', { admin: true }).firestore();
+    await assertSucceeds(
+      setDoc(doc(db, 'incidents/incident-1'), { title: 'Teste', severity: 'low', status: 'open' })
+    );
+    await assertSucceeds(getDoc(doc(db, 'incidents/incident-1')));
+  });
+
+  it('um proprietário de família comum não pode ler nem escrever incidentes', async () => {
+    const db = testEnv.authenticatedContext(OWNER_A).firestore();
+    await assertFails(getDoc(doc(db, 'incidents/incident-1')));
+    await assertFails(
+      setDoc(doc(db, 'incidents/incident-2'), { title: 'Intrusão', severity: 'high', status: 'open' })
+    );
   });
 });

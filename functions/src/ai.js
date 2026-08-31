@@ -35,6 +35,7 @@ const { regionalFunctions: functions, HttpsError } = require('./regional');
 const { db } = require('./init');
 const { FieldValue } = require('firebase-admin/firestore');
 const { requireAuth, resolveChildAccess } = require('./util');
+const { LIMITS, enforcePerUserAndChildLimit } = require('./rateLimit');
 
 // ---------------------------------------------------------------------
 // Bloqueio de conteúdo clínico — aplica-se tanto à pergunta recebida como
@@ -57,11 +58,64 @@ const BLOCKED_PATTERNS = [
   /qual o tratamento/i,
   /que tratamento/i,
   /devo dar (mais|menos)/i,
+  // Decisão escolar automática — pedir à IA para decidir o percurso
+  // escolar da criança é tão fora de âmbito como um diagnóstico.
+  /deve (repetir|reprovar|transitar)/i,
+  /deve ficar reti(d[oa])/i,
+  /que turma (deve|é melhor)/i,
+  /deve (ser|passar a) ser? colocad[oa] (em|na)/i,
+  /decis(ã|a)o (de|sobre) coloca(ç|c)(ã|a)o escolar/i,
 ];
 
 function containsBlockedIntent(text) {
   if (!text) return false;
   return BLOCKED_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+// ---------------------------------------------------------------------
+// Deteção de conteúdo crítico/emergência — deliberadamente SEPARADA do
+// bloqueio de âmbito acima. Uma pergunta que sugira risco imediato (ex.:
+// ideação suicida, convulsão, dificuldade respiratória) nunca deve
+// receber a resposta genérica de "isto está fora do âmbito" — tem de
+// apontar sempre para serviços de emergência, e nunca tentar fazer
+// triagem clínica (nunca pergunta "há quanto tempo" ou "quão grave").
+// ---------------------------------------------------------------------
+const CRISIS_PATTERNS = [
+  /pensamentos? suicidas?/i,
+  /quero (morrer|desaparecer|acabar com tudo)/i,
+  /(fazer mal a|magoar) (mim|si|ele|ela) (próprio|própria|mesmo|mesma)/i,
+  /tentativa de suicídio/i,
+  /convuls(ão|ões)/i,
+  /n(ã|a)o est(á|a) a respirar/i,
+  /engoliu (algo|um|uma|comprimidos|pastilhas)/i,
+  /overdose/i,
+  /em perigo (de vida|imediato)/i,
+  /inconsciente/i,
+];
+
+function containsCrisisIndicator(text) {
+  if (!text) return false;
+  return CRISIS_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+// ---------------------------------------------------------------------
+// Falsa certeza — a resposta nunca pode soar mais definitiva do que os
+// dados permitem. Aplica-se ao texto final da resposta como defesa em
+// profundidade (o adaptador mock, escrito à mão, já não usa estas
+// palavras — mas um adaptador real futuro poderia).
+// ---------------------------------------------------------------------
+const FALSE_CERTAINTY_PATTERNS = [
+  /com (toda a )?certeza/i,
+  /garantidamente/i,
+  /definitivamente/i,
+  /sem d[uú]vida (nenhuma|alguma)/i,
+  /100% de certeza/i,
+  /certamente (é|tem|sofre)/i,
+];
+
+function containsFalseCertaintyLanguage(text) {
+  if (!text) return false;
+  return FALSE_CERTAINTY_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 /**
@@ -107,8 +161,13 @@ async function retrieveChildContext(childId, questionText, limit = 6) {
     documentTitleById.set(doc.id, doc.data().docType || 'documento');
   });
 
+  // Remove pontuação colada às palavras (ex.: "medicação?", "sono,")
+  // antes de filtrar por comprimento — sem isto, qualquer pergunta
+  // terminada em pontuação perdia a correspondência da sua última
+  // palavra-chave.
   const keywords = String(questionText || '')
     .toLowerCase()
+    .replace(/[.,!?;:()"'“”«»]/g, ' ')
     .split(/\s+/)
     .filter((word) => word.length >= 4)
     .slice(0, 12);
@@ -208,13 +267,30 @@ const BLOCKED_RESPONSE = {
 };
 
 /**
+ * Resposta a conteúdo crítico/emergência — deliberadamente NUNCA tenta
+ * avaliar gravidade, fazer perguntas de acompanhamento ou triagem
+ * clínica. Só uma instrução clara e imediata.
+ */
+const EMERGENCY_RESPONSE = {
+  blocked: true,
+  emergency: true,
+  summary:
+    'Isto pode descrever uma emergência. A Sobredot não pode avaliar situações de emergência nem substituir apoio médico urgente.',
+  facts: [],
+  sources: [],
+  uncertainties: [],
+  suggestion:
+    'Ligue imediatamente para o número de emergência (112 em Portugal) ou dirija-se ao serviço de urgência mais próximo. Se estiver em risco imediato, não espere.',
+  disclaimer: DISCLAIMER,
+};
+
+/**
  * Callable "Perguntar aos documentos". Só devolve informação da criança
  * indicada, nunca de outra — a verificação de vínculo (família ou
  * concessão com capacidade "view" + âmbito "documents") acontece antes de
  * qualquer recuperação.
  */
-const askDocuments = functions.https.onCall(async (data, context) => {
-  const uid = requireAuth(context);
+async function askDocumentsHandler(data, uid) {
   const { childId, question } = data || {};
 
   if (typeof childId !== 'string' || !childId) {
@@ -230,7 +306,28 @@ const askDocuments = functions.https.onCall(async (data, context) => {
   }
   const child = access.child;
 
+  // Direito de restrição de processamento (Etapa 5) — a família pediu
+  // explicitamente para o gateway de IA não processar esta criança.
+  if (child.processingRestricted) {
+    throw new HttpsError(
+      'failed-precondition',
+      'O processamento de IA para esta criança está restringido a pedido da família.'
+    );
+  }
+
+  // Limite por utilizador e por criança — falha segura (recusa o
+  // pedido) em vez de processar sem limite. Ver docs/security-hardening.md.
+  await enforcePerUserAndChildLimit('ai_ask', uid, childId, LIMITS.AI_ASK_PER_USER, LIMITS.AI_ASK_PER_CHILD);
+
   const startedAt = Date.now();
+
+  // Conteúdo crítico/emergência tem SEMPRE prioridade sobre o bloqueio
+  // de âmbito normal — nunca "isto está fora do âmbito", sempre o
+  // encaminhamento para emergência. Nunca faz triagem clínica.
+  if (containsCrisisIndicator(question)) {
+    await logAiQuery({ childId, familyId: child.familyId, uid, blocked: true, emergency: true, sourceCount: 0, startedAt });
+    return EMERGENCY_RESPONSE;
+  }
 
   // Bloqueio ANTES de qualquer recuperação ou geração — não gastamos
   // sequer a leitura de documentos numa pergunta já claramente fora do
@@ -245,9 +342,14 @@ const askDocuments = functions.https.onCall(async (data, context) => {
 
   // Segunda barreira: mesmo que a pergunta pareça inofensiva, recusamos
   // devolver uma resposta cujo conteúdo recuperado descreva instruções de
-  // dose ou afins (defesa em profundidade).
+  // dose ou afins, ou soe mais definitiva do que os dados permitem
+  // (defesa em profundidade).
   const answerText = JSON.stringify(answer);
   if (containsBlockedIntent(answerText)) {
+    await logAiQuery({ childId, familyId: child.familyId, uid, blocked: true, sourceCount: items.length, startedAt });
+    return BLOCKED_RESPONSE;
+  }
+  if (containsFalseCertaintyLanguage(answerText)) {
     await logAiQuery({ childId, familyId: child.familyId, uid, blocked: true, sourceCount: items.length, startedAt });
     return BLOCKED_RESPONSE;
   }
@@ -270,18 +372,24 @@ const askDocuments = functions.https.onCall(async (data, context) => {
     uncertainties: answer.uncertainties,
     disclaimer: DISCLAIMER,
   };
+}
+
+const askDocuments = functions.https.onCall(async (data, context) => {
+  const uid = requireAuth(context);
+  return askDocumentsHandler(data, uid);
 });
 
 /**
  * Regista SÓ metadados técnicos da pergunta — nunca o texto da pergunta,
  * da resposta ou de qualquer documento. Ver docs/logging-policy.md.
  */
-async function logAiQuery({ childId, familyId, uid, blocked, sourceCount, sourceDocumentIds, startedAt }) {
+async function logAiQuery({ childId, familyId, uid, blocked, emergency, sourceCount, sourceDocumentIds, startedAt }) {
   await db.collection(`children/${childId}/aiQueries`).add({
     askedBy: uid,
     childId,
     familyId,
     blocked,
+    emergency: Boolean(emergency),
     sourceCount,
     sourceDocumentIds: sourceDocumentIds || [],
     durationMs: Date.now() - startedAt,
@@ -291,10 +399,15 @@ async function logAiQuery({ childId, familyId, uid, blocked, sourceCount, source
 
 module.exports = {
   askDocuments,
+  askDocumentsHandler,
   // exportado para reutilização pelo pipeline de extração (documents.js)
   // e para testes unitários isolados (ver functions/test/ai.test.js).
   containsBlockedIntent,
+  containsCrisisIndicator,
+  containsFalseCertaintyLanguage,
   sanitizeUntrustedText,
   retrieveChildContext,
   buildGroundedAnswer,
+  BLOCKED_RESPONSE,
+  EMERGENCY_RESPONSE,
 };

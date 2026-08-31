@@ -19,6 +19,20 @@ function requireVerifiedEmail(context) {
   return uid;
 }
 
+/**
+ * Administrador técnico — papel operacional (ver adminClaims.js), nunca
+ * um acesso de emergência a conteúdo de família/criança (ver
+ * docs/threat-model.md e docs/pilot-plan.md: decidido não implementar
+ * esse acesso).
+ */
+function requireAdmin(context) {
+  const uid = requireAuth(context);
+  if (context.auth.token.admin !== true) {
+    throw new HttpsError('permission-denied', 'Requer papel de administrador técnico.');
+  }
+  return uid;
+}
+
 async function getFamilyMember(familyId, uid) {
   const snap = await db.doc(`families/${familyId}/members/${uid}`).get();
   return snap.exists ? snap.data() : null;
@@ -108,6 +122,7 @@ function isValidEmail(value) {
 module.exports = {
   requireAuth,
   requireVerifiedEmail,
+  requireAdmin,
   getFamilyMember,
   requireFamilyOwner,
   requireFamilyMembership,

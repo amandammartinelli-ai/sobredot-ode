@@ -13,7 +13,7 @@ import { beforeEach, describe, it, expect } from 'vitest';
 // (functions/src/init.js já chama admin.initializeApp() ao ser
 // carregado). FIRESTORE_EMULATOR_HOST é definido automaticamente pelo
 // "firebase emulators:exec" que envolve este teste.
-import { admin, db } from '../../functions/src/init.js';
+import { db, Timestamp } from '../../functions/src/init.js';
 import { resolveChildAccess } from '../../functions/src/util.js';
 
 beforeEach(async () => {
@@ -63,7 +63,7 @@ describe('resolveChildAccess (functions/src/util.js)', () => {
       familyId: FAMILY_A,
       capabilities: ['view'],
       scopeCategories: ['documents'],
-      expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() - 60 * 1000),
+      expiresAt: Timestamp.fromMillis(Date.now() - 60 * 1000),
     });
 
     const result = await resolveChildAccess(CHILD_A1, GRANTEE, { capability: 'view', category: 'documents' });
@@ -78,7 +78,7 @@ describe('resolveChildAccess (functions/src/util.js)', () => {
       familyId: FAMILY_A,
       capabilities: ['view'],
       scopeCategories: ['school'],
-      expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 60 * 60 * 1000),
+      expiresAt: Timestamp.fromMillis(Date.now() + 60 * 60 * 1000),
     });
 
     const result = await resolveChildAccess(CHILD_A1, GRANTEE, { capability: 'view', category: 'documents' });
@@ -93,7 +93,7 @@ describe('resolveChildAccess (functions/src/util.js)', () => {
       familyId: FAMILY_A,
       capabilities: ['view'],
       scopeCategories: ['documents'],
-      expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 60 * 60 * 1000),
+      expiresAt: Timestamp.fromMillis(Date.now() + 60 * 60 * 1000),
     });
 
     const result = await resolveChildAccess(CHILD_A1, GRANTEE, { capability: 'view', category: 'documents' });

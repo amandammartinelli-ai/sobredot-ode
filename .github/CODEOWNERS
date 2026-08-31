@@ -1,0 +1,14 @@
+# Donos de código — usado para pedir revisão automaticamente quando a
+# proteção do branch principal exigir "Require review from Code Owners"
+# (ver docs/ci-cd.md). Só há um responsável neste momento: substituir por
+# uma equipa (@sobredot/reviewers) assim que exista mais do que uma
+# pessoa a rever código, para não haver um único ponto de aprovação.
+* @amandammartinelli-ai
+
+# Áreas particularmente sensíveis — regras de segurança e funções de
+# servidor — ficam aqui explícitas para que uma alteração nunca passe
+# sem revisão, mesmo que a regra "*" acima venha a ser alargada a mais
+# pessoas no futuro.
+/firestore.rules @amandammartinelli-ai
+/storage.rules @amandammartinelli-ai
+/functions/ @amandammartinelli-ai

@@ -256,3 +256,31 @@ classe) tem mais especificidade do que o estilo por omissão do agente de
 utilizador para `[hidden]`, pelo que `nav.hidden = true` não tinha
 qualquer efeito visual nesse cenário — reproduzido e corrigido durante o
 teste manual desta etapa, confirmado por captura de ecrã antes/depois.
+
+## 22. `firebase-admin` mantido em `^12.7.0`, apesar de uma tentativa de subir para v14 (Etapa 5)
+
+**Decisão:** o `npm audit` da Etapa 5 sugeriu atualizar `firebase-admin`
+para resolver um aviso de segurança. A tentativa de subir para a v14
+revelou que essa versão deixou de reexportar `.firestore`/`.auth`/
+`.storage`/`.apps` a partir de `require('firebase-admin')` (só os
+métodos de ciclo de vida da app) — obrigando a reescrever
+`functions/src/init.js` para imports modulares
+(`firebase-admin/{app,firestore,auth,storage}`). Isso, por sua vez,
+expôs um problema mais sério: os testes em `tests/rules/*.js` (fora de
+`functions/`, com o seu PRÓPRIO `node_modules/firebase-admin`) passaram
+a falhar com "Detected an object of type Timestamp that doesn't match
+the expected instance" sempre que construíam um `Timestamp` a partir de
+`firebase-admin/firestore` importado diretamente — porque essa era uma
+cópia diferente da classe usada internamente por `db`.
+**Decisão final:** reverter só o número da versão de volta a
+`^12.7.0` (`git checkout` + `npm install`) — a vulnerabilidade
+reportada pelo `npm audit` está numa dependência transitiva profunda do
+SDK de armazenamento, sem caminho de exploração prático no nosso uso, e
+persiste de qualquer forma na v14 (não seria sequer resolvida pela
+subida de versão). **Mantido**, porque continua a ser a correção certa
+independentemente da versão: a reescrita de `init.js` para imports
+modulares, e o padrão de reexportar `Timestamp`/`FieldValue` a partir
+desse mesmo ficheiro para qualquer código fora de `functions/` importar
+dali — nunca diretamente de `firebase-admin/firestore` — evitando a
+categoria inteira deste problema no futuro, com ou sem upgrade de
+versão.

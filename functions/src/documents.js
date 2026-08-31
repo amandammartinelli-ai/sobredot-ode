@@ -17,13 +17,14 @@
  */
 const crypto = require('crypto');
 const { regionalFunctions: functions, HttpsError } = require('./regional');
-const { db, admin } = require('./init');
+const { db, storage } = require('./init');
 const { FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { detectRealMimeType, declaredTypeMatchesReal } = require('./contentSniff');
 const { getAntivirusAdapter } = require('./antivirus');
 const { extractPagesFromBuffer, extractStructuredItemsFromPages } = require('./extraction');
 const { getOcrAdapter } = require('./ocr');
 const { requireAuth, requireChildFamilyOwner, resolveChildAccess, getFamilyMember } = require('./util');
+const { writeAuditEvent } = require('./audit');
 
 const PATH_PATTERN = /^documents\/([^/]+)\/([^/]+)\/([^/]+)\/(\d+)$/;
 const MAX_ATTEMPTS = 3;
@@ -82,7 +83,7 @@ const onDocumentUpload = functions.storage.object().onFinalize(async (object) =>
 
   if (!claimed) return null;
 
-  const bucket = admin.storage().bucket(object.bucket);
+  const bucket = storage.bucket(object.bucket);
   const file = bucket.file(object.name);
 
   try {
@@ -322,7 +323,7 @@ const getDocumentUploadUrl = functions.https.onCall(async (data, context) => {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  const bucket = admin.storage().bucket();
+  const bucket = storage.bucket();
   const file = bucket.file(storagePath);
   const [url] = await file.getSignedUrl({
     action: 'write',
@@ -366,11 +367,23 @@ const getDocumentDownloadUrl = functions.https.onCall(async (data, context) => {
     throw new HttpsError('not-found', 'Versão do documento não encontrada.');
   }
 
-  const bucket = admin.storage().bucket();
+  const bucket = storage.bucket();
   const file = bucket.file(versionSnap.data().storagePath);
   const [url] = await file.getSignedUrl({
     action: 'read',
     expires: Date.now() + SIGNED_URL_TTL_MS,
+  });
+
+  // Auditoria imutável de visualização (Etapa 5) — só metadados técnicos
+  // (quem, qual versão, através de que vínculo), nunca o conteúdo.
+  await writeAuditEvent({
+    action: 'document.viewed',
+    actorUid: uid,
+    targetType: 'document',
+    targetId: documentId,
+    familyId: access.familyId || null,
+    childId,
+    metadata: { version, via: access.reason },
   });
 
   return { url, expiresAt: Date.now() + SIGNED_URL_TTL_MS };
@@ -395,7 +408,7 @@ const purgeExpiredDocuments = functions.pubsub.schedule('every 24 hours').onRun(
     .where('deletedAt', '<=', cutoff)
     .get();
 
-  const bucket = admin.storage().bucket();
+  const bucket = storage.bucket();
 
   await Promise.all(
     toPurge.docs.map(async (docSnap) => {

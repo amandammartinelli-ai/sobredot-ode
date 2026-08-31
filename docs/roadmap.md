@@ -80,7 +80,59 @@ ser concluída, validada e aprovada antes de avançar para a seguinte.
   contestado, profissional revogado, relatório com escopo parcial, link
   expirado.
 
-## Etapa 5 — Preparação para produção e lançamento (prevista)
+## Etapa 5 — Robustecimento para piloto controlado ✅ concluída
+
+Esta etapa **não** foi "preparação para produção geral" (essa
+descrição, escrita prospetivamente numa etapa anterior, foi movida para
+"Etapa 6" abaixo) — foi um robustecimento deliberado, sem
+funcionalidades vistosas novas, para tornar as Etapas 1–4 uma candidata
+segura a um **piloto controlado** (nunca, por si só, uma autorização
+para dados reais — ver `docs/pilot-plan.md`, critérios de bloqueio).
+
+- Auditoria de segurança completa (regras, Cloud Functions, segredos)
+  — duas falhas reais encontradas e corrigidas (enumeração de contas
+  por mensagens de erro; regra de listagem de auditoria que bloqueava
+  os próprios proprietários) — ver `docs/security-hardening.md`.
+- Quotas e limites anti-abuso para todas as operações de IA, por
+  utilizador e por criança, sempre com falha segura
+  (`functions/src/rateLimit.js`).
+- Auditoria imutável estendida (login, visualização de documento,
+  exportação, eliminação, ações administrativas).
+- Direitos da família completos: exportação estruturada, restrição de
+  processamento por IA, eliminação reforçada com prazo de reflexão e
+  eliminação física em cascata (Firestore + Storage) — ver
+  `docs/governance/data-rights.md`.
+- Suíte de avaliação de segurança da IA com dados sintéticos, cobrindo
+  as 14 categorias exigidas (alucinação, fuga entre crianças, prompt
+  injection, diagnóstico/prescrição, decisão escolar automática,
+  linguagem causal, falsa certeza, emergência, entre outras) —
+  `tests/rules/aiSafetyEvals.integration.test.js`.
+- Auditoria de acessibilidade WCAG 2.2 AA automatizada (axe-core) nos
+  15 ecrãs principais — 8 violações encontradas e corrigidas, 0 na
+  segunda passagem — ver `docs/accessibility.md`.
+- Desempenho: divisão de código por rota, correção de dados sensíveis
+  que sobreviviam ao logout no `localStorage`, revisão do número de
+  leituras do Firestore — ver `docs/security-hardening.md`.
+- CI/CD (GitHub Actions, Dependabot, CODEOWNERS, modelo de PR) e
+  configuração Netlify (cabeçalhos de segurança/CSP, redirects,
+  separação de ambientes dev/staging/produção) — ver `docs/ci-cd.md` e
+  `docs/deploy-netlify.md`.
+- Painel administrativo operacional, só com dados agregados (nunca
+  conteúdo de família/criança) — `docs/admin-dashboard.md`.
+- Rascunhos de governança e privacidade (mapa de dados, AIPD, RAT,
+  política de privacidade, termos, consentimento parental, informação
+  para a criança, política de resposta a incidentes) — todos
+  explicitamente pendentes de validação jurídica —
+  `docs/governance/`.
+- Modelo de ameaças atualizado com STRIDE e runbooks operacionais
+  (backup/restauro, rotação de segredos, resposta a vulnerabilidades,
+  resposta a incidentes, deploy/rollback) — `docs/threat-model.md`,
+  `docs/runbooks/`.
+- Plano de piloto em três portões, com critérios de bloqueio do
+  lançamento e a decisão explícita de não implementar acesso
+  administrativo de emergência — `docs/pilot-plan.md`.
+
+## Etapa 6 — Produção real (prevista)
 
 - Ligação real a um fornecedor de IA, só depois de satisfeitos todos os
   requisitos contratuais documentados em `docs/vendors.md` (DPA,
@@ -92,18 +144,17 @@ ser concluída, validada e aprovada antes de avançar para a seguinte.
   credenciais reais (não verificável no sandbox de desenvolvimento desta
   etapa — ver `docs/firebase-setup.md`).
 - Serviço real de antivírus e, se necessário, de OCR.
-- Revisão de privacidade e segurança dedicada antes de qualquer dado
-  real, incluindo avaliação de impacto se aplicável.
+- Revisão jurídica formal dos documentos de `docs/governance/`
+  (a Etapa 5 só entrega os rascunhos de engenharia).
 - Multi-família por criança (ex.: pais em agregados separados) — ver
   `docs/decisions.md`, decisão 11.
 - Envio real de e-mail para convites (fornecedor a contratar).
 - Notificações (push/e-mail) sem conteúdo sensível, alinhadas com
   `docs/logging-policy.md`.
-- Auditoria e monitorização operacional para produção (alertas,
-  dashboards de saúde do sistema).
 - Deploy de produção do Firebase (projeto real, região confirmada,
   regras de Storage/Firestore publicadas, App Check obrigatório sem
-  modo de depuração).
+  modo de depuração, backups configurados e testados — ver
+  `docs/runbooks/backup-restore.md`).
 
 ---
 

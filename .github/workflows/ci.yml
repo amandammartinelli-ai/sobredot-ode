@@ -1,0 +1,83 @@
+name: CI
+
+# Corre em cada PR e em cada push ao branch protegido. Nenhum destes
+# passos precisa de credenciais reais: os testes de regras usam o
+# Firebase Emulator Suite com um projeto de demonstração
+# (demo-sobredot-tests), nunca um projeto Firebase real — ver
+# docs/ci-cd.md.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Um push novo ao mesmo PR cancela a execução anterior, em vez de as
+# acumular.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  frontend:
+    name: Frontend — lint, testes unitários, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run build
+
+  functions:
+    name: Cloud Functions — lint, testes unitários
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci
+        working-directory: functions
+      - run: npm run lint
+        working-directory: functions
+      - run: npm run test
+        working-directory: functions
+
+  rules:
+    name: Regras Firestore/Storage (Firebase Emulator Suite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      # Os emuladores de Firestore/Storage correm em Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci
+      # tests/rules/ importa Timestamp/FieldValue de functions/src/init.js
+      # (ver esse ficheiro) — a mesma cópia do firebase-admin usada pelas
+      # Cloud Functions, por isso as dependências de functions/ têm de
+      # estar instaladas mesmo só para correr os testes de regras.
+      - run: npm ci
+        working-directory: functions
+      - run: npx firebase-tools setup:emulators:firestore
+      - run: npx firebase-tools setup:emulators:storage
+      - run: npm run test:rules
+
+  # Nenhum job de deploy aqui: a produção é publicada só pelo Netlify a
+  # partir do branch protegido (ver netlify.toml e docs/deploy-netlify.md)
+  # e as Cloud Functions/regras são publicadas manualmente com
+  # `firebase deploy`, nunca automaticamente por este workflow — ver
+  # docs/ci-cd.md, "O que fica fora deste CI".

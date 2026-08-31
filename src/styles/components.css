@@ -172,6 +172,10 @@
 }
 
 /* --- Selo de categoria --- */
+/* Etapa 5 (auditoria WCAG 2.2 AA): a cor da categoria nunca é usada como
+   fundo com texto escuro por cima — várias combinações falhavam o
+   contraste mínimo de 4.5:1. A cor de categoria fica só no contorno; o
+   fundo e o texto são sempre o par de alto contraste do tema. */
 .category-chip {
   display: inline-flex;
   align-items: center;
@@ -180,8 +184,9 @@
   border-radius: var(--radius-full);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  background: var(--chip-color, var(--color-neutral-100));
+  background: var(--color-neutral-100);
   color: var(--color-neutral-900);
+  border: 2px solid var(--chip-color, var(--color-neutral-300));
 }
 
 .category-chip__dot {

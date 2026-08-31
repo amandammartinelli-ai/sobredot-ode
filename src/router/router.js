@@ -3,25 +3,6 @@ import { renderAppNav } from '../components/appNav.js';
 import { isAuthenticated } from '../services/authService.js';
 import { findMyFamilyId } from '../services/familyService.js';
 import { setFamilyId } from '../state/appState.js';
-import { renderWelcomeView } from '../views/welcome/welcomeView.js';
-import { renderLoginView } from '../views/auth/loginView.js';
-import { renderSignupView } from '../views/auth/signupView.js';
-import { renderResetPasswordView } from '../views/auth/resetPasswordView.js';
-import { renderOnboardingView } from '../views/onboarding/onboardingView.js';
-import { renderDashboardView } from '../views/dashboard/dashboardView.js';
-import { renderChildProfileView } from '../views/children/childProfileView.js';
-import { renderRegisterView } from '../views/register/registerView.js';
-import { renderTimelineView } from '../views/timeline/timelineView.js';
-import { renderDocumentsView } from '../views/documents/documentsView.js';
-import { renderDocumentDetailView } from '../views/documents/documentDetailView.js';
-import { renderInsightsView } from '../views/insights/insightsView.js';
-import { renderReportsView } from '../views/reports/reportsView.js';
-import { renderSharedReportView } from '../views/reports/sharedReportView.js';
-import { renderOdeLibraryView } from '../views/library/odeLibraryView.js';
-import { renderCollaboratorView } from '../views/collaborator/collaboratorView.js';
-import { renderFamilyView } from '../views/family/familyView.js';
-import { renderAcceptInviteView } from '../views/family/acceptInviteView.js';
-import { renderProfileView } from '../views/profile/profileView.js';
 import { renderNotFoundView } from '../views/notFoundView.js';
 import { createLoadingState } from '../components/states/loadingState.js';
 
@@ -34,28 +15,109 @@ import { createLoadingState } from '../components/states/loadingState.js';
  *  - 'public'      — qualquer pessoa, mesmo sem sessão
  *  - 'auth'        — exige sessão iniciada (não exige família)
  *  - 'family'      — exige sessão E família (onboarding concluído)
+ *
+ * `load`: função que devolve a Promise de import() da vista — nunca um
+ * import estático no topo do ficheiro. Isto divide o bundle por rota
+ * (Etapa 5, "Desempenho": o ficheiro único ultrapassava 800 KB) — cada
+ * ecrã só é transferido quando o utilizador de facto o visita. As rotas
+ * "public" (boas-vindas/login/registo) continuam a carregar primeiro,
+ * por serem sempre o ponto de entrada.
  */
 const routes = {
-  '': { view: renderWelcomeView, access: 'public', showChrome: false },
-  welcome: { view: renderWelcomeView, access: 'public', showChrome: false },
-  login: { view: renderLoginView, access: 'public', showChrome: false },
-  signup: { view: renderSignupView, access: 'public', showChrome: false },
-  'reset-password': { view: renderResetPasswordView, access: 'public', showChrome: false },
-  onboarding: { view: renderOnboardingView, access: 'auth', showChrome: false },
-  dashboard: { view: renderDashboardView, access: 'family', showChrome: true },
-  crianca: { view: renderChildProfileView, access: 'family', showChrome: true },
-  registar: { view: renderRegisterView, access: 'family', showChrome: true },
-  timeline: { view: renderTimelineView, access: 'family', showChrome: true },
-  documents: { view: renderDocumentsView, access: 'family', showChrome: true },
-  documento: { view: renderDocumentDetailView, access: 'family', showChrome: true },
-  insights: { view: renderInsightsView, access: 'family', showChrome: true },
-  reports: { view: renderReportsView, access: 'family', showChrome: true },
-  'relatorio-partilhado': { view: renderSharedReportView, access: 'public', showChrome: false },
-  'biblioteca-ode': { view: renderOdeLibraryView, access: 'family', showChrome: true },
-  colaborador: { view: renderCollaboratorView, access: 'auth', showChrome: false },
-  family: { view: renderFamilyView, access: 'family', showChrome: true },
-  'aceitar-convite': { view: renderAcceptInviteView, access: 'public', showChrome: false },
-  profile: { view: renderProfileView, access: 'family', showChrome: true },
+  '': { load: () => import('../views/welcome/welcomeView.js').then((m) => m.renderWelcomeView), access: 'public', showChrome: false },
+  welcome: { load: () => import('../views/welcome/welcomeView.js').then((m) => m.renderWelcomeView), access: 'public', showChrome: false },
+  login: { load: () => import('../views/auth/loginView.js').then((m) => m.renderLoginView), access: 'public', showChrome: false },
+  signup: { load: () => import('../views/auth/signupView.js').then((m) => m.renderSignupView), access: 'public', showChrome: false },
+  'reset-password': {
+    load: () => import('../views/auth/resetPasswordView.js').then((m) => m.renderResetPasswordView),
+    access: 'public',
+    showChrome: false,
+  },
+  onboarding: {
+    load: () => import('../views/onboarding/onboardingView.js').then((m) => m.renderOnboardingView),
+    access: 'auth',
+    showChrome: false,
+  },
+  dashboard: {
+    load: () => import('../views/dashboard/dashboardView.js').then((m) => m.renderDashboardView),
+    access: 'family',
+    showChrome: true,
+  },
+  crianca: {
+    load: () => import('../views/children/childProfileView.js').then((m) => m.renderChildProfileView),
+    access: 'family',
+    showChrome: true,
+  },
+  registar: {
+    load: () => import('../views/register/registerView.js').then((m) => m.renderRegisterView),
+    access: 'family',
+    showChrome: true,
+  },
+  timeline: {
+    load: () => import('../views/timeline/timelineView.js').then((m) => m.renderTimelineView),
+    access: 'family',
+    showChrome: true,
+  },
+  documents: {
+    load: () => import('../views/documents/documentsView.js').then((m) => m.renderDocumentsView),
+    access: 'family',
+    showChrome: true,
+  },
+  documento: {
+    load: () => import('../views/documents/documentDetailView.js').then((m) => m.renderDocumentDetailView),
+    access: 'family',
+    showChrome: true,
+  },
+  insights: {
+    load: () => import('../views/insights/insightsView.js').then((m) => m.renderInsightsView),
+    access: 'family',
+    showChrome: true,
+  },
+  reports: {
+    load: () => import('../views/reports/reportsView.js').then((m) => m.renderReportsView),
+    access: 'family',
+    showChrome: true,
+  },
+  'relatorio-partilhado': {
+    load: () => import('../views/reports/sharedReportView.js').then((m) => m.renderSharedReportView),
+    access: 'public',
+    showChrome: false,
+  },
+  'biblioteca-ode': {
+    load: () => import('../views/library/odeLibraryView.js').then((m) => m.renderOdeLibraryView),
+    access: 'family',
+    showChrome: true,
+  },
+  colaborador: {
+    load: () => import('../views/collaborator/collaboratorView.js').then((m) => m.renderCollaboratorView),
+    access: 'auth',
+    showChrome: false,
+  },
+  family: {
+    load: () => import('../views/family/familyView.js').then((m) => m.renderFamilyView),
+    access: 'family',
+    showChrome: true,
+  },
+  'aceitar-convite': {
+    load: () => import('../views/family/acceptInviteView.js').then((m) => m.renderAcceptInviteView),
+    access: 'public',
+    showChrome: false,
+  },
+  profile: {
+    load: () => import('../views/profile/profileView.js').then((m) => m.renderProfileView),
+    access: 'family',
+    showChrome: true,
+  },
+  admin: {
+    // Nunca na navegação principal (ver src/components/appNav.js) — só
+    // acessível por link direto, à semelhança de "colaborador". Exige só
+    // sessão iniciada, não família: um administrador técnico pode nunca
+    // ter uma família própria. A verificação real de admin é sempre do
+    // lado do servidor — ver docs/admin-dashboard.md.
+    load: () => import('../views/admin/adminView.js').then((m) => m.renderAdminView),
+    access: 'auth',
+    showChrome: false,
+  },
 };
 
 function parseRoute() {
@@ -95,8 +157,12 @@ export async function renderRoute({ moveFocus = true } = {}) {
     return;
   }
 
+  // Estado de carregamento visível enquanto o código da vista (e, para
+  // rotas "family", a resolução da família) ainda não chegou — evita um
+  // ecrã em branco percetível em ligações lentas (ver docs/accessibility.md).
+  mount(root, createLoadingState());
+
   if (route.access === 'family') {
-    mount(root, createLoadingState());
     const familyId = await findMyFamilyId();
     if (!familyId) {
       window.location.hash = '#/onboarding';
@@ -105,12 +171,14 @@ export async function renderRoute({ moveFocus = true } = {}) {
     setFamilyId(familyId);
   }
 
+  const view = await route.load();
+
   setChromeVisible(Boolean(route.showChrome));
   if (route.showChrome) {
     renderAppNav(routeName || 'dashboard');
   }
 
-  const node = await route.view({ navigate, params });
+  const node = await view({ navigate, params });
   mount(root, node);
   if (moveFocus) focusMainHeading();
 }

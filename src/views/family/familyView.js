@@ -3,6 +3,7 @@ import { t } from '../../i18n/index.js';
 import { formatDateTime } from '../../utils/format.js';
 import { loadChildContext } from '../../utils/childContext.js';
 import {
+  getFamily,
   subscribeFamilyMembers,
   listPendingInvites,
   inviteFamilyMember,
@@ -17,6 +18,7 @@ import {
 import { listFamilyConsents, grantFamilyConsent } from '../../services/consentService.js';
 import { listFamilyAuditEvents } from '../../services/auditService.js';
 import { getCurrentUser } from '../../services/authService.js';
+import { requestFamilyDeletion, cancelFamilyDeletion } from '../../services/dataRightsService.js';
 import { openConfirmDialog } from '../../components/confirmDialog.js';
 import { createErrorState } from '../../components/states/errorState.js';
 
@@ -40,7 +42,8 @@ export async function renderFamilyView() {
   let selectedChildId = children[0]?.id || null;
 
   async function render() {
-    const [members, invites, consents, auditEvents] = await Promise.all([
+    const [family, members, invites, consents, auditEvents] = await Promise.all([
+      getFamily(familyId),
       new Promise((resolve) => {
         const unsubscribe = subscribeFamilyMembers(familyId, (list) => {
           unsubscribe();
@@ -62,6 +65,61 @@ export async function renderFamilyView() {
       renderAccessGrantsSection(grants, isOwner),
       renderConsentsSection(consents, isOwner),
       renderAuditSection(auditEvents),
+      isOwner ? renderDeletionSection(family) : '',
+    ]);
+  }
+
+  function renderDeletionSection(family) {
+    const pending = family?.deletionRequest?.status === 'pending' ? family.deletionRequest : null;
+    const confirmInput = h('input', { class: 'input', type: 'text', placeholder: family?.name || '' });
+    const feedback = h('div', {});
+
+    if (pending) {
+      const scheduledFor = pending.scheduledFor?.toDate ? pending.scheduledFor.toDate() : pending.scheduledFor;
+      return h('section', { class: 'card', style: 'margin-bottom: var(--space-4); border-color: var(--color-danger-500)' }, [
+        h('h2', { style: 'font-size:var(--font-size-md)' }, [t('family.deletionTitle')]),
+        h('div', { class: 'notice notice--danger' }, [
+          h('p', {}, [`${t('family.deletionPendingBody')} ${formatDateTime(scheduledFor)}.`]),
+          h('button', {
+            type: 'button',
+            class: 'btn btn--secondary',
+            onClick: async () => {
+              await cancelFamilyDeletion(familyId);
+              render();
+            },
+          }, [t('family.deletionCancelCta')]),
+        ]),
+      ]);
+    }
+
+    return h('section', { class: 'card', style: 'margin-bottom: var(--space-4); border-color: var(--color-danger-500)' }, [
+      h('h2', { style: 'font-size:var(--font-size-md)' }, [t('family.deletionTitle')]),
+      h('p', {}, [t('family.deletionHint')]),
+      feedback,
+      h('div', { class: 'form-field' }, [
+        h('label', {}, [`${t('family.deletionConfirmLabelPrefix')} "${family?.name}"`]),
+        confirmInput,
+      ]),
+      h('button', {
+        type: 'button',
+        class: 'btn btn--ghost',
+        onClick: () => {
+          openConfirmDialog({
+            title: t('family.deletionConfirmDialogTitle'),
+            body: t('family.deletionConfirmDialogBody'),
+            confirmLabel: t('family.deletionCta'),
+            cancelLabel: t('common.cancel'),
+            onConfirm: async () => {
+              try {
+                await requestFamilyDeletion(familyId, confirmInput.value.trim());
+                render();
+              } catch (err) {
+                mount(feedback, [createErrorState({ body: err.message })]);
+              }
+            },
+          });
+        },
+      }, [t('family.deletionCta')]),
     ]);
   }
 
@@ -139,7 +197,7 @@ export async function renderFamilyView() {
   function renderAccessGrantsSection(grants, isOwner) {
     const childSelect = h(
       'select',
-      { class: 'select', style: 'max-width:220px' },
+      { class: 'select', id: 'family-grants-child', style: 'max-width:220px' },
       children.map((child) => h('option', { value: child.id, selected: child.id === selectedChildId || undefined }, [child.name]))
     );
     childSelect.addEventListener('change', () => {
@@ -170,7 +228,7 @@ export async function renderFamilyView() {
     return h('section', { class: 'card', style: 'margin-bottom: var(--space-4)' }, [
       h('h2', { style: 'font-size:var(--font-size-md)' }, [t('family.sectionAccessGrants')]),
       h('p', { class: 'view__lead' }, [t('family.sectionAccessGrantsHint')]),
-      h('div', { class: 'form-field' }, [h('label', {}, [t('family.selectChildLabel')]), childSelect]),
+      h('div', { class: 'form-field' }, [h('label', { for: 'family-grants-child' }, [t('family.selectChildLabel')]), childSelect]),
 
       h('h3', { style: 'font-size:var(--font-size-sm)' }, [t('family.activeGrantsTitle')]),
       grants.length === 0

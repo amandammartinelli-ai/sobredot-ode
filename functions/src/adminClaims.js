@@ -28,6 +28,31 @@ const onUserCreate = functions.auth.user().onCreate(async (user) => {
     );
 });
 
+/**
+ * Auditoria de início de sessão (Etapa 5). Chamada pelo cliente logo a
+ * seguir a um login bem-sucedido (ver src/services/authService.js).
+ * Nota de limitação honesta: por ser iniciada pelo cliente, é
+ * telemetria "melhor esforço" (um cliente malicioso podia nunca a
+ * chamar) — nunca um controlo de segurança por si só. A fronteira de
+ * segurança real continua a ser sempre `firestore.rules`/
+ * `resolveChildAccess`, nunca este registo. Um mecanismo de deteção de
+ * início de sessão ao nível do próprio fornecedor de identidade (ex.:
+ * Cloud Identity Platform "blocking functions") fica para uma etapa de
+ * produção futura — ver docs/security-hardening.md.
+ */
+const logLoginEvent = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new HttpsError('unauthenticated', 'É necessário iniciar sessão.');
+  }
+  await writeAuditEvent({
+    action: 'auth.login',
+    actorUid: context.auth.uid,
+    targetType: 'user',
+    targetId: context.auth.uid,
+  });
+  return { ok: true };
+});
+
 const setAdminClaim = functions.https.onCall(async (data, context) => {
   if (!context.auth || context.auth.token.admin !== true) {
     throw new HttpsError(
@@ -53,4 +78,4 @@ const setAdminClaim = functions.https.onCall(async (data, context) => {
   return { ok: true };
 });
 
-module.exports = { onUserCreate, setAdminClaim };
+module.exports = { onUserCreate, setAdminClaim, logLoginEvent };

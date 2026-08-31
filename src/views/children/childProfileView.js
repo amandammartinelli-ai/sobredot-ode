@@ -2,8 +2,10 @@ import { h, mount } from '../../utils/dom.js';
 import { t } from '../../i18n/index.js';
 import { createChildForm } from '../../components/childForm.js';
 import { createErrorState } from '../../components/states/errorState.js';
+import { openConfirmDialog } from '../../components/confirmDialog.js';
 import { getFamilyId } from '../../state/appState.js';
-import { createChild, getChild, updateChild, setSelectedChildId } from '../../services/childrenService.js';
+import { createChild, getChild, updateChild, softDeleteChild, setSelectedChildId } from '../../services/childrenService.js';
+import { setChildProcessingRestriction } from '../../services/dataRightsService.js';
 
 export async function renderChildProfileView({ params }) {
   const childId = params[0] && params[0] !== 'novo' ? params[0] : null;
@@ -38,6 +40,50 @@ export async function renderChildProfileView({ params }) {
       ]),
       error ? createErrorState({ body: error }) : '',
       form,
+      childId ? renderProcessingRestrictionSection() : '',
+      childId ? renderDeleteSection() : '',
+    ]);
+  }
+
+  function renderProcessingRestrictionSection() {
+    const isRestricted = Boolean(existing.processingRestricted);
+    return h('section', { class: 'card', style: 'margin-top: var(--space-4)' }, [
+      h('h2', { style: 'font-size:var(--font-size-md)' }, [t('children.processingRestrictionTitle')]),
+      h('p', { class: 'view__lead' }, [t('children.processingRestrictionHint')]),
+      h('label', { class: 'chip-option', style: 'width:fit-content' }, [
+        h('input', {
+          type: 'checkbox',
+          checked: isRestricted || undefined,
+          onChange: async (event) => {
+            await setChildProcessingRestriction(childId, event.target.checked);
+            existing.processingRestricted = event.target.checked;
+            render();
+          },
+        }),
+        t('children.processingRestrictionLabel'),
+      ]),
+    ]);
+  }
+
+  function renderDeleteSection() {
+    return h('section', { class: 'card', style: 'margin-top: var(--space-4)' }, [
+      h('h2', { style: 'font-size:var(--font-size-md)' }, [t('children.dangerZoneTitle')]),
+      h('button', {
+        type: 'button',
+        class: 'btn btn--ghost',
+        onClick: () => {
+          openConfirmDialog({
+            title: t('children.deleteConfirmTitle'),
+            body: t('children.deleteConfirmBody'),
+            confirmLabel: t('children.deleteCta'),
+            cancelLabel: t('common.cancel'),
+            onConfirm: async () => {
+              await softDeleteChild(childId);
+              window.location.hash = '#/dashboard';
+            },
+          });
+        },
+      }, [t('children.deleteCta')]),
     ]);
   }
 

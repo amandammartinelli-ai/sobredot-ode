@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # Dependências do frontend (raiz do projeto).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      dev-dependencies:
+        dependency-type: development
+
+  # Dependências das Cloud Functions — projeto npm separado.
+  - package-ecosystem: npm
+    directory: /functions
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      dev-dependencies:
+        dependency-type: development
+
+  # As próprias GitHub Actions usadas no workflow de CI.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

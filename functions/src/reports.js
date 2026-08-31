@@ -24,6 +24,7 @@ const { db } = require('./init');
 const { FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { writeAuditEvent } = require('./audit');
 const { requireAuth, requireFamilyMembership, isNonEmptyString } = require('./util');
+const { LIMITS, enforcePerUserLimit } = require('./rateLimit');
 const metrics = require('./metrics');
 
 const VALID_MODULES = ['summary', 'timeline', 'insights', 'documents', 'goals'];
@@ -231,6 +232,7 @@ async function loadChildAndPeriod(data, uid) {
  */
 async function generateReportHandler(data, uid) {
   const { childId, child, period, modules, timeZone } = await loadChildAndPeriod(data, uid);
+  await enforcePerUserLimit('generate_report', uid, LIMITS.REPORT_PER_USER);
   const documentIds = Array.isArray(data.documentIds) ? data.documentIds.slice(0, 50) : [];
   return assembleReport({ childId, child, period, modules, documentIds, timeZone });
 }
@@ -249,6 +251,7 @@ const generateReport = functions.https.onCall(async (data, context) => {
  */
 async function createReportShareLinkHandler(data, uid) {
   const { childId, child, period, modules, timeZone } = await loadChildAndPeriod(data, uid);
+  await enforcePerUserLimit('create_share_link', uid, LIMITS.SHARE_LINK_PER_USER);
   const documentIds = Array.isArray(data.documentIds) ? data.documentIds.slice(0, 50) : [];
 
   const expiresInHours = Number(data.expiresInHours);

@@ -1,5 +1,6 @@
 {
   "name": "sobredot-functions",
+  "version": "0.1.0",
   "description": "Cloud Functions da Sobredot — lógica de servidor: famílias, concessões de acesso, auditoria, cofre de documentos e gateway de IA.",
   "private": true,
   "engines": {

@@ -14,7 +14,11 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../firebase/app.js';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '../firebase/app.js';
+import { clearAllSobredotData } from './storageService.js';
+
+const logLoginEventFn = httpsCallable(functions, 'logLoginEvent');
 
 let currentUser = null;
 let authReadyResolve;
@@ -62,6 +66,20 @@ export function isEmailVerified() {
   return Boolean(currentUser?.emailVerified);
 }
 
+/**
+ * Só para decidir o que MOSTRAR (esconder o painel administrativo de
+ * quem não é administrador) — nunca a fronteira de segurança real, que
+ * é sempre `context.auth.token.admin` do lado do servidor
+ * (`functions/src/util.js`, `requireAdmin`) e `isAdmin()` nas regras do
+ * Firestore. Um utilizador que force a rota sem ser administrador só
+ * veria um painel vazio: todos os pedidos ao servidor seriam recusados.
+ */
+export async function isAdmin() {
+  if (!currentUser) return false;
+  const result = await currentUser.getIdTokenResult();
+  return result.claims.admin === true;
+}
+
 export async function signUp({ email, password, displayName }) {
   const credential = await createUserWithEmailAndPassword(auth, email, password);
   if (displayName) {
@@ -84,11 +102,22 @@ export async function signUp({ email, password, displayName }) {
 
 export async function signIn({ email, password }) {
   const credential = await signInWithEmailAndPassword(auth, email, password);
+  // Telemetria "melhor esforço" para o histórico de atividade (Etapa 5)
+  // — nunca bloqueia o login se falhar (ex.: sem rede num instante).
+  logLoginEventFn().catch(() => {});
   return credential.user;
 }
 
 export async function signOutUser() {
   await signOut(auth);
+  // Não há service worker nem cache de disco do Firestore nesta aplicação
+  // (ver docs/security-hardening.md, "Cache seguro"), mas o localStorage
+  // (família/criança selecionada, perguntas para a próxima consulta) fica
+  // no dispositivo entre sessões do browser — num dispositivo partilhado
+  // isso podia expor qual família/criança usou a aplicação, ou conteúdo
+  // escrito pela família, a quem iniciasse sessão a seguir. Apaga-se tudo
+  // no logout; volta a ser escrito normalmente na sessão seguinte.
+  clearAllSobredotData();
 }
 
 export async function resendVerificationEmail() {

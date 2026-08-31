@@ -24,7 +24,10 @@ async function writeAuditEvent({ action, actorUid, actorRole, targetType, target
     action,
     actorUid: actorUid || null,
     actorRole: actorRole || (actorUid ? 'user' : 'system'),
-    targetType,
+    // Aceita "sem alvo" (ex.: abuse.rate_limited em rateLimit.js, que não
+    // identifica nenhuma família/criança/documento em concreto) — sem
+    // isto o Admin SDK recusa a escrita por causa de `undefined`.
+    targetType: targetType || null,
     targetId: targetId || null,
     familyId: familyId || null,
     childId: childId || null,
@@ -81,4 +84,34 @@ const onRecordWrite = functions.firestore
     });
   });
 
-module.exports = { writeAuditEvent, onChildWrite, onRecordWrite };
+/**
+ * Etapa 5: auditoria do ciclo de vida de um documento do cofre — criação,
+ * mudanças de estado (aprovado/rejeitado/eliminado). Nunca regista
+ * `issuer`/`specialty` (podem identificar um profissional/entidade) nem
+ * qualquer conteúdo — só `status`, que é uma categoria fechada e segura
+ * (ver docs/logging-policy.md).
+ */
+const onDocumentMetaWrite = functions.firestore
+  .document('children/{childId}/documents/{documentId}')
+  .onWrite(async (change, context) => {
+    const actorUid = context.auth ? context.auth.uid : null;
+    const before = change.before.exists ? change.before.data() : null;
+    const after = change.after.exists ? change.after.data() : null;
+    if (!after) return null;
+
+    let action = 'document.status_changed';
+    if (!before) action = 'document.created';
+    else if (!before.deletedAt && after.deletedAt) action = 'document.deleted';
+
+    return writeAuditEvent({
+      action,
+      actorUid,
+      targetType: 'document',
+      targetId: context.params.documentId,
+      familyId: after.familyId || null,
+      childId: context.params.childId,
+      metadata: { status: after.status },
+    });
+  });
+
+module.exports = { writeAuditEvent, onChildWrite, onRecordWrite, onDocumentMetaWrite };

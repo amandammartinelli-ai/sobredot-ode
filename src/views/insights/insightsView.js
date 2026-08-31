@@ -15,6 +15,7 @@ import {
 } from '../../services/insightsService.js';
 import { listGoals, createGoal, updateGoalStatus, softDeleteGoal } from '../../services/goalsService.js';
 import { recordCategories } from '../../data/mock/categories.js';
+import { readJSON, writeJSON } from '../../services/storageService.js';
 
 const PERIOD_OPTIONS = [
   { value: '7d', labelKey: 'insights.period7d' },
@@ -36,24 +37,24 @@ const STATUS_LABEL_KEYS = {
   contested: 'insights.statusContested',
 };
 
-const QUESTIONS_STORAGE_PREFIX = 'sobredot.nextVisitQuestions.';
+const QUESTIONS_STORAGE_PREFIX = 'nextVisitQuestions.';
 
+/**
+ * As perguntas para a próxima consulta passam pela mesma camada
+ * (storageService) que o resto dos dados locais, em vez de tocar
+ * diretamente no localStorage: só assim ficam dentro do espaço de nomes
+ * "sobredot:" que é apagado no logout (ver `signOutUser` em
+ * authService.js e docs/security-hardening.md, "Cache seguro") — este
+ * texto é escrito pela família e pode conter conteúdo sensível sobre a
+ * criança, pelo que não pode sobreviver num dispositivo partilhado depois
+ * de terminada a sessão.
+ */
 function loadQuestions(childId) {
-  try {
-    const raw = localStorage.getItem(QUESTIONS_STORAGE_PREFIX + childId);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+  return readJSON(QUESTIONS_STORAGE_PREFIX + childId, []);
 }
 
 function saveQuestions(childId, questions) {
-  try {
-    localStorage.setItem(QUESTIONS_STORAGE_PREFIX + childId, JSON.stringify(questions));
-  } catch {
-    // localStorage indisponível (ex.: modo privado) — as perguntas só não
-    // persistem entre sessões; não é um erro que impeça o resto da vista.
-  }
+  writeJSON(QUESTIONS_STORAGE_PREFIX + childId, questions);
 }
 
 export async function renderInsightsView({ navigate }) {
@@ -186,7 +187,8 @@ export async function renderInsightsView({ navigate }) {
       render();
     });
 
-    const categorySelect = h('select', { class: 'select' }, [
+    sourceSelect.id = 'insights-filter-source';
+    const categorySelect = h('select', { class: 'select', id: 'insights-filter-category' }, [
       h('option', { value: '' }, [t('insights.filterCategoryAll')]),
       ...recordCategories.map((c) => h('option', { value: c.id }, [t(`${c.i18nKey}.label`)])),
     ]);
@@ -196,16 +198,22 @@ export async function renderInsightsView({ navigate }) {
       render();
     });
 
-    const contextInput = h('input', { class: 'input', type: 'search', value: filters.contextText, placeholder: t('insights.filterContextPlaceholder') });
+    const contextInput = h('input', {
+      class: 'input',
+      type: 'search',
+      id: 'insights-filter-context',
+      value: filters.contextText,
+      placeholder: t('insights.filterContextPlaceholder'),
+    });
     contextInput.addEventListener('change', () => {
       filters.contextText = contextInput.value.trim();
       render();
     });
 
     return h('section', { class: 'card', style: 'margin-bottom: var(--space-4); display:flex; gap:var(--space-3); flex-wrap:wrap; align-items:end' }, [
-      h('div', { class: 'form-field' }, [h('label', {}, [t('insights.filterSourceLabel')]), sourceSelect]),
-      h('div', { class: 'form-field' }, [h('label', {}, [t('insights.filterCategoryLabel')]), categorySelect]),
-      h('div', { class: 'form-field' }, [h('label', {}, [t('insights.filterContextLabel')]), contextInput]),
+      h('div', { class: 'form-field' }, [h('label', { for: 'insights-filter-source' }, [t('insights.filterSourceLabel')]), sourceSelect]),
+      h('div', { class: 'form-field' }, [h('label', { for: 'insights-filter-category' }, [t('insights.filterCategoryLabel')]), categorySelect]),
+      h('div', { class: 'form-field' }, [h('label', { for: 'insights-filter-context' }, [t('insights.filterContextLabel')]), contextInput]),
       h('p', { class: 'form-field__hint', style: 'flex-basis:100%' }, [t('insights.filtersScopeHint')]),
     ]);
   }
@@ -424,7 +432,7 @@ export async function renderInsightsView({ navigate }) {
       mount(
         list,
         questions.length === 0
-          ? [h('p', { class: 'card__meta' }, [t('insights.noQuestionsYet')])]
+          ? [h('li', { class: 'card__meta', style: 'list-style:none' }, [t('insights.noQuestionsYet')])]
           : questions.map((q, index) =>
               h('li', { style: 'display:flex; justify-content:space-between; gap:var(--space-2)' }, [
                 h('span', {}, [q]),
@@ -468,9 +476,9 @@ export async function renderInsightsView({ navigate }) {
   }
 
   function renderGoalsSection(goals, insights) {
-    const titleInput = h('input', { class: 'input', type: 'text', required: true });
-    const descriptionInput = h('textarea', { class: 'textarea' });
-    const targetDateInput = h('input', { class: 'input', type: 'date' });
+    const titleInput = h('input', { class: 'input', type: 'text', id: 'goal-title', required: true });
+    const descriptionInput = h('textarea', { class: 'textarea', id: 'goal-description' });
+    const targetDateInput = h('input', { class: 'input', type: 'date', id: 'goal-target-date' });
 
     const recommendationInsight = insights.find((i) => i.patternType === 'document_recommendations');
     const importableEvidence = (recommendationInsight?.evidence || []).filter((e) => e.documentId);
@@ -533,9 +541,9 @@ export async function renderInsightsView({ navigate }) {
           },
         },
         [
-          h('div', { class: 'form-field' }, [h('label', {}, [t('goals.titleLabel')]), titleInput]),
-          h('div', { class: 'form-field' }, [h('label', {}, [t('goals.descriptionLabel')]), descriptionInput]),
-          h('div', { class: 'form-field' }, [h('label', {}, [t('goals.targetDateLabel')]), targetDateInput]),
+          h('div', { class: 'form-field' }, [h('label', { for: 'goal-title' }, [t('goals.titleLabel')]), titleInput]),
+          h('div', { class: 'form-field' }, [h('label', { for: 'goal-description' }, [t('goals.descriptionLabel')]), descriptionInput]),
+          h('div', { class: 'form-field' }, [h('label', { for: 'goal-target-date' }, [t('goals.targetDateLabel')]), targetDateInput]),
           h('button', { type: 'submit', class: 'btn btn--secondary' }, [t('goals.createCta')]),
         ]
       ),
