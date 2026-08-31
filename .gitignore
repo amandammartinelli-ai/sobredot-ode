@@ -1,0 +1,27 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+.vite/
+
+# Ambiente local (nunca commitar segredos reais)
+.env
+.env.local
+.env.*.local
+
+# Editor / SO
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Cobertura de testes
+coverage/

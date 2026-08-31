@@ -1,0 +1,221 @@
+/**
+ * Layout — estrutura da aplicação (mobile-first).
+ * Breakpoints: 768px (tablet), 1024px (desktop).
+ */
+
+.container {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding-inline: var(--space-8);
+  }
+}
+
+/* --- Cabeçalho --- */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-header__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-700);
+  text-decoration: none;
+  font-size: var(--font-size-lg);
+}
+
+.app-header__endorsement {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-muted);
+}
+
+/* --- Aviso de dados de demonstração --- */
+.demo-banner {
+  background: var(--color-warning-100);
+  color: var(--color-warning-700);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-warning-500);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-banner);
+}
+
+/* --- Conteúdo principal --- */
+#main-content {
+  display: block;
+  min-height: 60vh;
+  padding-bottom: calc(var(--space-16) + 64px); /* espaço para a nav inferior */
+}
+
+.view {
+  padding-block: var(--space-6);
+}
+
+.view__header {
+  margin-bottom: var(--space-6);
+}
+
+.view__lead {
+  color: var(--color-text-muted);
+  max-width: 60ch;
+}
+
+/* --- Navegação principal (barra inferior em telemóvel) --- */
+.app-nav {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: var(--z-nav);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-around;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.app-nav__link {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-1);
+  min-height: var(--touch-target-min);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  border-top: 3px solid transparent;
+}
+
+.app-nav__link[aria-current='page'] {
+  color: var(--color-brand-600);
+  border-top-color: var(--color-brand-500);
+  font-weight: var(--font-weight-medium);
+}
+
+.app-nav__icon {
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+/* --- Desktop: navegação lateral, sem barra inferior --- */
+@media (min-width: 1024px) {
+  .app-nav {
+    /* O <main> vem antes na ordem do documento (leitura de ecrã e foco após
+       navegação chegam primeiro ao conteúdo); "order" só reposiciona
+       visualmente a navegação para a esquerda no ecrã grande. */
+    order: -1;
+    position: sticky;
+    top: 60px;
+    inset-inline: auto;
+    bottom: auto;
+    flex-direction: column;
+    width: 220px;
+    height: calc(100vh - 60px);
+    border-top: none;
+    border-right: 1px solid var(--color-border);
+    justify-content: flex-start;
+    padding: var(--space-6) var(--space-3);
+    gap: var(--space-1);
+  }
+
+  .app-nav__link {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    border-top: none;
+    border-left: 3px solid transparent;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-md);
+  }
+
+  .app-nav__link[aria-current='page'] {
+    border-top-color: transparent;
+    border-left-color: var(--color-brand-500);
+    background: var(--color-brand-50);
+  }
+
+  #app-body.app-shell {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    align-items: start;
+  }
+
+  #main-content {
+    padding-bottom: var(--space-16);
+  }
+}
+
+/* --- Grelha do dashboard --- */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.shortcuts-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  margin-block: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .shortcuts-row {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* --- Grelha de categorias no fluxo de registo --- */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+@media (min-width: 640px) {
+  .category-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .category-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}

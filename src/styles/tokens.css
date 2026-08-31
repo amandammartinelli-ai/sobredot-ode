@@ -1,0 +1,146 @@
+/**
+ * Sistema de design Sobredot — tokens (variáveis CSS)
+ * Ver docs/design-system.md para a documentação completa.
+ */
+
+:root {
+  /* --- Cor: marca --- */
+  --color-brand-50: #eef5f2;
+  --color-brand-100: #d3e6de;
+  --color-brand-200: #a7cdbe;
+  --color-brand-300: #7bb39d;
+  --color-brand-400: #57997f;
+  --color-brand-500: #3b6e63; /* cor primária da marca */
+  --color-brand-600: #2f574f;
+  --color-brand-700: #24413b;
+  --color-brand-800: #182b27;
+  --color-brand-900: #0c1614;
+
+  --color-accent-50: #fbf3e9;
+  --color-accent-300: #f0c98a;
+  --color-accent-500: #e0a13d; /* acento quente, usado com moderação */
+  --color-accent-700: #a6741f;
+
+  /* --- Cor: neutros --- */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f7f7f5;
+  --color-neutral-100: #eeede9;
+  --color-neutral-200: #dedcd5;
+  --color-neutral-300: #c3c0b7;
+  --color-neutral-400: #9d998d;
+  --color-neutral-500: #79766c;
+  --color-neutral-600: #5c594f;
+  --color-neutral-700: #423f39;
+  --color-neutral-800: #2b2925;
+  --color-neutral-900: #171613;
+
+  /* --- Cor: estados semânticos --- */
+  --color-success-100: #e1f2e6;
+  --color-success-500: #2f8f5b;
+  --color-success-700: #1f6440;
+
+  --color-warning-100: #fbf0da;
+  --color-warning-500: #b8791f;
+  --color-warning-700: #8a5a14;
+
+  --color-danger-100: #fbe6e4;
+  --color-danger-500: #b8402f;
+  --color-danger-700: #872c1f;
+
+  --color-info-100: #e3edf7;
+  --color-info-500: #35678f;
+  --color-info-700: #234867;
+
+  /* --- Cor: categorias de registo (paleta calma, distinguível) --- */
+  --color-cat-emocoes: #b1608a;
+  --color-cat-comportamentos: #8a72b8;
+  --color-cat-sono: #4c6faa;
+  --color-cat-alimentacao: #c07a35;
+  --color-cat-medicacao: #b8402f;
+  --color-cat-escola: #35678f;
+  --color-cat-comunicacao: #3b8fa3;
+  --color-cat-sensorial: #7a9a3f;
+  --color-cat-conquistas: #d1a12a;
+  --color-cat-observacoes: #6b6f76;
+
+  /* --- Papéis de cor (semânticos, para uso em componentes) --- */
+  --color-bg: var(--color-neutral-50);
+  --color-surface: var(--color-neutral-0);
+  --color-surface-raised: var(--color-neutral-0);
+  --color-border: var(--color-neutral-200);
+  --color-border-strong: var(--color-neutral-300);
+  --color-text: var(--color-neutral-800);
+  --color-text-muted: var(--color-neutral-600);
+  --color-text-inverse: var(--color-neutral-0);
+  --color-link: var(--color-brand-600);
+  --color-focus-ring: #1a5cff;
+
+  /* --- Tipografia --- */
+  --font-family-base:
+    'Atkinson Hyperlegible', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-family-heading: var(--font-family-base);
+
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.375rem;
+  --font-size-2xl: 1.75rem;
+  --font-size-3xl: 2.25rem;
+
+  --line-height-tight: 1.25;
+  --line-height-base: 1.5;
+  --line-height-relaxed: 1.7;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+
+  /* --- Espaçamento (escala 4px) --- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* --- Raios --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 999px;
+
+  /* --- Sombras (suaves, sem excesso de profundidade) --- */
+  --shadow-sm: 0 1px 2px rgba(23, 22, 19, 0.06);
+  --shadow-md: 0 4px 12px rgba(23, 22, 19, 0.08);
+  --shadow-lg: 0 10px 30px rgba(23, 22, 19, 0.12);
+
+  /* --- Transições --- */
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 320ms ease;
+
+  /* --- Camadas --- */
+  --z-nav: 100;
+  --z-header: 110;
+  --z-banner: 120;
+  --z-dialog: 200;
+
+  /* --- Contentor --- */
+  --container-max: 72rem;
+  --touch-target-min: 44px;
+}
+
+/* Reduz movimento para quem o pede ao sistema operativo */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+    --transition-slow: 0ms;
+  }
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Sobredot — uma solução da Oficina das Emoções</title>
+    <meta
+      name="description"
+      content="Sobredot: uma visão integrada e longitudinal da criança, reunindo registos da família, escola e profissionais. Protótipo de demonstração."
+    />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#3B6E63" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/src/styles/main.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Saltar para o conteúdo principal</a>
+
+    <div id="demo-banner-root" role="status" aria-live="polite"></div>
+
+    <header id="app-header" data-app-header></header>
+
+    <div id="app-body" data-app-body>
+      <main id="main-content" tabindex="-1">
+        <div id="app" data-app-root></div>
+      </main>
+
+      <nav id="app-nav" class="app-nav" data-app-nav aria-label="Navegação principal"></nav>
+    </div>
+
+    <div id="aria-live-region" class="visually-hidden" role="status" aria-live="polite"></div>
+    <div id="dialog-root" data-dialog-root></div>
+
+    <noscript>
+      <p style="padding: 1rem; font-family: sans-serif">
+        A Sobredot precisa de JavaScript ativo no seu navegador para funcionar.
+      </p>
+    </noscript>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

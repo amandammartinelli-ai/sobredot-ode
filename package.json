@@ -1,0 +1,21 @@
+{
+  "name": "sobredot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sobredot - uma solução da Oficina das Emoções. Visão integrada e longitudinal da criança.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . --ext .js"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "jsdom": "^24.1.0",
+    "vite": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
