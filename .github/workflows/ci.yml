@@ -60,11 +60,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      # Os emuladores de Firestore/Storage correm em Java.
+      # Os emuladores de Firestore/Storage correm em Java. firebase-tools
+      # deixou de suportar Java anterior à versão 21 — ver
+      # https://github.com/firebase/firebase-tools/releases.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
       - run: npm ci
       # tests/rules/ importa Timestamp/FieldValue de functions/src/init.js
       # (ver esse ficheiro) — a mesma cópia do firebase-admin usada pelas
