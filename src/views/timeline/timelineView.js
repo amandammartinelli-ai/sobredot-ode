@@ -3,6 +3,7 @@ import { t } from '../../i18n/index.js';
 import { formatDateTime } from '../../utils/format.js';
 import { loadChildContext } from '../../utils/childContext.js';
 import { listRecords, softDeleteRecord, listRecordHistory } from '../../services/recordsService.js';
+import { getFamilyMemberNames } from '../../services/familyService.js';
 import { recordCategories, getCategoryById } from '../../data/mock/categories.js';
 import { createCategoryChip } from '../../components/categoryTile.js';
 import { createEmptyState } from '../../components/states/emptyState.js';
@@ -10,9 +11,10 @@ import { openConfirmDialog } from '../../components/confirmDialog.js';
 
 const SOURCE_OPTIONS = ['family', 'school', 'professional', 'other'];
 
-function createRecordItem(record, { childId, onDeleted, onShowHistory }) {
+function createRecordItem(record, { childId, memberNames, onDeleted, onShowHistory }) {
   const category = getCategoryById(record.categoryId);
   const occurredAt = record.occurredAt?.toDate ? record.occurredAt.toDate() : record.occurredAt;
+  const authorName = memberNames[record.createdBy] || t('timeline.unknownAuthor');
 
   return h('li', { class: 'card', style: 'margin-bottom: var(--space-3)' }, [
     h('div', { style: 'display:flex; justify-content:space-between; gap:var(--space-3); flex-wrap:wrap; align-items:center' }, [
@@ -20,7 +22,7 @@ function createRecordItem(record, { childId, onDeleted, onShowHistory }) {
       h('time', { datetime: String(occurredAt), class: 'card__meta' }, [formatDateTime(occurredAt)]),
     ]),
     h('p', { style: 'margin: var(--space-3) 0 0' }, [record.notes || record.outcome || record.behavior || '—']),
-    h('p', { class: 'card__meta' }, [`${t('timeline.authorLabel')}: ${record.createdBy}`, record.version > 1 ? ` · ${t('timeline.editedBadge')}` : '']),
+    h('p', { class: 'card__meta' }, [`${t('timeline.authorLabel')}: ${authorName}`, record.version > 1 ? ` · ${t('timeline.editedBadge')}` : '']),
     h('div', { style: 'display:flex; gap:var(--space-2); margin-top:var(--space-2)' }, [
       h('button', { type: 'button', class: 'btn btn--ghost', onClick: () => onShowHistory(record) }, [t('timeline.historyTitle')]),
       h('button', {
@@ -44,7 +46,7 @@ function createRecordItem(record, { childId, onDeleted, onShowHistory }) {
 }
 
 export async function renderTimelineView() {
-  const { selectedChild } = await loadChildContext();
+  const { familyId, selectedChild } = await loadChildContext();
   const container = h('div', { class: 'container view' });
 
   if (!selectedChild) {
@@ -53,6 +55,9 @@ export async function renderTimelineView() {
   }
 
   let filters = { categoryId: '', source: '' };
+  // Resolvido uma única vez (não muda por filtro) — se falhar, os
+  // registos continuam a aparecer, só com o nome genérico de fallback.
+  const memberNames = await getFamilyMemberNames(familyId).catch(() => ({}));
 
   async function renderList() {
     const records = await listRecords(selectedChild.id, {
@@ -111,6 +116,7 @@ export async function renderTimelineView() {
             records.map((record) =>
               createRecordItem(record, {
                 childId: selectedChild.id,
+                memberNames,
                 onDeleted: renderList,
                 onShowHistory: (record) => showHistory(selectedChild.id, record),
               })

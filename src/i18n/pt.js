@@ -338,6 +338,7 @@ export default {
     historyTitle: 'Histórico de alterações',
     historyEmpty: 'Sem alterações registadas.',
     authorLabel: 'Registado por',
+    unknownAuthor: 'Membro da família',
   },
 
   documents: {

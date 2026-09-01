@@ -18,13 +18,14 @@
  */
 const { regionalFunctions: functions, HttpsError } = require('./regional');
 const crypto = require('crypto');
-const { db } = require('./init');
+const { db, auth } = require('./init');
 const { FieldValue, Timestamp } = require('firebase-admin/firestore');
 const { writeAuditEvent } = require('./audit');
 const {
   requireAuth,
   requireVerifiedEmail,
   requireFamilyOwner,
+  requireFamilyMembership,
   isNonEmptyString,
   isValidEmail,
 } = require('./util');
@@ -227,4 +228,46 @@ const removeFamilyMember = functions.https.onCall(async (data, context) => {
   return { ok: true };
 });
 
-module.exports = { createFamily, inviteFamilyMember, acceptFamilyInvite, removeFamilyMember };
+/**
+ * Devolve o nome de exibição de cada membro da família, para a interface
+ * mostrar "Registado por: <nome>" em vez do ID de conta bruto. Os nomes
+ * vêm sempre do Firebase Auth (nunca de uma cópia guardada no documento
+ * de membro), para nunca ficarem desatualizados se alguém mudar o seu
+ * nome — e para já funcionar em registos antigos, criados antes desta
+ * função existir, sem precisar de nenhuma migração de dados.
+ *
+ * `users/{uid}` não serve para isto: as regras só deixam cada
+ * utilizador ler o seu próprio perfil (ver firestore.rules), por isso só
+ * o Admin SDK, aqui no servidor, consegue resolver o nome de outro
+ * membro da família.
+ */
+const getFamilyMemberNames = functions.https.onCall(async (data, context) => {
+  const uid = requireAuth(context);
+  const { familyId } = data || {};
+
+  if (!isNonEmptyString(familyId, 200)) {
+    throw new HttpsError('invalid-argument', 'Família inválida.');
+  }
+  await requireFamilyMembership(familyId, uid);
+
+  const membersSnap = await db.collection(`families/${familyId}/members`).get();
+  const memberUids = membersSnap.docs.map((doc) => doc.id);
+  if (memberUids.length === 0) {
+    return { names: {} };
+  }
+
+  const { users } = await auth.getUsers(memberUids.map((memberUid) => ({ uid: memberUid })));
+  const names = {};
+  users.forEach((user) => {
+    names[user.uid] = user.displayName || null;
+  });
+  return { names };
+});
+
+module.exports = {
+  createFamily,
+  inviteFamilyMember,
+  acceptFamilyInvite,
+  removeFamilyMember,
+  getFamilyMemberNames,
+};
