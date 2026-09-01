@@ -271,7 +271,13 @@ export default {
       validationError: 'Reveja os campos assinalados antes de guardar.',
     },
     details: {
-      sleep: { bedTime: 'Hora de deitar', wakeTime: 'Hora de acordar', nightWakings: 'Despertares noturnos', sleepQuality: 'Qualidade do sono' },
+      sleep: {
+        bedTime: 'Hora de deitar',
+        wakeTime: 'Hora de acordar',
+        nightWakings: 'Despertares noturnos',
+        sleepQuality: 'Qualidade do sono',
+        sleepQualityScale: ['Muito má', 'Má', 'Regular', 'Boa', 'Excelente'],
+      },
       food: { mealType: 'Refeição', itemsAccepted: 'Aceitou', itemsRefused: 'Recusou', appetite: 'Apetite' },
       medication: { medicationName: 'Medicamento', doseGiven: 'Dose administrada', administered: 'Administrada conforme prescrito', sideEffects: 'Efeitos observados' },
       school: { activity: 'Atividade', participation: 'Participação' },
