@@ -39,23 +39,49 @@ const DETAIL_FIELDS_BY_CATEGORY = {
     },
   ],
   food: [
-    { key: 'mealType', labelKey: 'register.details.food.mealType', type: 'text' },
+    {
+      key: 'mealType',
+      labelKey: 'register.details.food.mealType',
+      type: 'choice',
+      choiceLabelsKey: 'register.details.food.mealTypeOptions',
+    },
     { key: 'itemsAccepted', labelKey: 'register.details.food.itemsAccepted', type: 'text' },
     { key: 'itemsRefused', labelKey: 'register.details.food.itemsRefused', type: 'text' },
-    { key: 'appetite', labelKey: 'register.details.food.appetite', type: 'text' },
+    {
+      key: 'appetite',
+      labelKey: 'register.details.food.appetite',
+      type: 'choice',
+      choiceLabelsKey: 'register.details.food.appetiteOptions',
+    },
   ],
   medication: [
     { key: 'medicationName', labelKey: 'register.details.medication.medicationName', type: 'text' },
     { key: 'doseGiven', labelKey: 'register.details.medication.doseGiven', type: 'text' },
+    {
+      key: 'administered',
+      labelKey: 'register.details.medication.administered',
+      type: 'choice',
+      choiceLabelsKey: 'register.details.medication.administeredOptions',
+    },
     { key: 'sideEffects', labelKey: 'register.details.medication.sideEffects', type: 'text' },
   ],
   school: [
     { key: 'activity', labelKey: 'register.details.school.activity', type: 'text' },
-    { key: 'participation', labelKey: 'register.details.school.participation', type: 'text' },
+    {
+      key: 'participation',
+      labelKey: 'register.details.school.participation',
+      type: 'choice',
+      choiceLabelsKey: 'register.details.school.participationOptions',
+    },
   ],
   communication: [
     { key: 'mode', labelKey: 'register.details.communication.mode', type: 'text' },
-    { key: 'initiatedBy', labelKey: 'register.details.communication.initiatedBy', type: 'text' },
+    {
+      key: 'initiatedBy',
+      labelKey: 'register.details.communication.initiatedBy',
+      type: 'choice',
+      choiceLabelsKey: 'register.details.communication.initiatedByOptions',
+    },
   ],
   sensory: [
     { key: 'stimulus', labelKey: 'register.details.sensory.stimulus', type: 'text' },
@@ -184,7 +210,34 @@ export async function renderRegisterView({ navigate }) {
       )
     );
 
-    const detailInputs = detailFields.map(({ key, labelKey, type, scaleLabelsKey }) => {
+    const detailInputs = detailFields.map(({ key, labelKey, type, scaleLabelsKey, choiceLabelsKey }) => {
+      if (type === 'choice') {
+        const choiceLabels = t(choiceLabelsKey);
+        return h('div', { class: 'form-field' }, [
+          h('span', { style: 'font-weight:var(--font-weight-medium); display:block; margin-bottom:var(--space-2)' }, [
+            t(labelKey),
+          ]),
+          h(
+            'div',
+            { class: 'radio-group', role: 'radiogroup', 'aria-label': t(labelKey) },
+            choiceLabels.map((choiceLabel) =>
+              h('label', { class: 'chip-option' }, [
+                h('input', {
+                  type: 'radio',
+                  name: `detail-${key}`,
+                  value: choiceLabel,
+                  checked: draft.details[key] === choiceLabel || undefined,
+                  onChange: () => {
+                    draft.details = { ...draft.details, [key]: choiceLabel };
+                  },
+                }),
+                choiceLabel,
+              ])
+            )
+          ),
+        ]);
+      }
+
       if (type === 'scale') {
         const scaleLabels = t(scaleLabelsKey);
         return h('div', { class: 'form-field' }, [
