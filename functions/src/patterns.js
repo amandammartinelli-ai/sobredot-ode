@@ -59,9 +59,15 @@ function coOccurrenceByDay(records, { conditionFn, outcomeFn, timeZone }) {
 
 const isHighIntensity = (r) => r.intensity === 'high';
 const hasNightWakings = (r) => r.categoryId === 'sleep' && Number(r.details && r.details.nightWakings) > 0;
-const hasLowSleepQuality = (r) =>
-  r.categoryId === 'sleep' && typeof (r.details && r.details.sleepQuality) === 'string' &&
-  /m[áa]|pouc|fraca|dif[íi]cil/i.test(r.details.sleepQuality);
+const hasLowSleepQuality = (r) => {
+  if (r.categoryId !== 'sleep') return false;
+  const quality = r.details && r.details.sleepQuality;
+  // Registos novos guardam uma escala 1–5 (clicável); registos antigos
+  // podem ainda ter texto livre — mantemos os dois formatos.
+  if (typeof quality === 'number') return quality <= 2;
+  if (typeof quality === 'string') return /m[áa]|pouc|fraca|dif[íi]cil/i.test(quality);
+  return false;
+};
 
 function analyzeSleepVsIntensity(records, timeZone) {
   const co = coOccurrenceByDay(records, {

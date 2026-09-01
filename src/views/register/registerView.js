@@ -31,7 +31,12 @@ const DETAIL_FIELDS_BY_CATEGORY = {
     { key: 'bedTime', labelKey: 'register.details.sleep.bedTime', type: 'time' },
     { key: 'wakeTime', labelKey: 'register.details.sleep.wakeTime', type: 'time' },
     { key: 'nightWakings', labelKey: 'register.details.sleep.nightWakings', type: 'number' },
-    { key: 'sleepQuality', labelKey: 'register.details.sleep.sleepQuality', type: 'text' },
+    {
+      key: 'sleepQuality',
+      labelKey: 'register.details.sleep.sleepQuality',
+      type: 'scale',
+      scaleLabelsKey: 'register.details.sleep.sleepQualityScale',
+    },
   ],
   food: [
     { key: 'mealType', labelKey: 'register.details.food.mealType', type: 'text' },
@@ -179,8 +184,36 @@ export async function renderRegisterView({ navigate }) {
       )
     );
 
-    const detailInputs = detailFields.map(({ key, labelKey, type }) =>
-      h('div', { class: 'form-field' }, [
+    const detailInputs = detailFields.map(({ key, labelKey, type, scaleLabelsKey }) => {
+      if (type === 'scale') {
+        const scaleLabels = t(scaleLabelsKey);
+        return h('div', { class: 'form-field' }, [
+          h('span', { style: 'font-weight:var(--font-weight-medium); display:block; margin-bottom:var(--space-2)' }, [
+            t(labelKey),
+          ]),
+          h(
+            'div',
+            { class: 'radio-group', role: 'radiogroup', 'aria-label': t(labelKey) },
+            scaleLabels.map((scaleLabel, index) => {
+              const scaleValue = index + 1;
+              return h('label', { class: 'chip-option' }, [
+                h('input', {
+                  type: 'radio',
+                  name: `detail-${key}`,
+                  value: scaleValue,
+                  checked: draft.details[key] === scaleValue || undefined,
+                  onChange: () => {
+                    draft.details = { ...draft.details, [key]: scaleValue };
+                  },
+                }),
+                `${scaleValue} · ${scaleLabel}`,
+              ]);
+            })
+          ),
+        ]);
+      }
+
+      return h('div', { class: 'form-field' }, [
         h('label', { for: `record-detail-${key}` }, [t(labelKey)]),
         h('input', {
           class: 'input',
@@ -191,8 +224,8 @@ export async function renderRegisterView({ navigate }) {
             draft.details = { ...draft.details, [key]: e.target.value };
           },
         }),
-      ])
-    );
+      ]);
+    });
 
     const notesInput = h('textarea', {
       class: 'textarea',
