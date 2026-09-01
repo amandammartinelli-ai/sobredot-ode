@@ -15,6 +15,7 @@ const createFamilyFn = httpsCallable(functions, 'createFamily');
 const inviteFamilyMemberFn = httpsCallable(functions, 'inviteFamilyMember');
 const acceptFamilyInviteFn = httpsCallable(functions, 'acceptFamilyInvite');
 const removeFamilyMemberFn = httpsCallable(functions, 'removeFamilyMember');
+const getFamilyMemberNamesFn = httpsCallable(functions, 'getFamilyMemberNames');
 
 export function getKnownFamilyId() {
   return readJSON(FAMILY_ID_KEY, null);
@@ -94,4 +95,15 @@ export async function removeFamilyMember(familyId, memberUid) {
 
 export function setKnownFamilyId(familyId) {
   rememberFamilyId(familyId);
+}
+
+/**
+ * Nome de exibição de cada membro da família (ver functions/src/family.js,
+ * getFamilyMemberNames — resolvido no servidor a partir do Firebase Auth,
+ * nunca lido diretamente do Firestore: as regras não deixam ler o perfil
+ * de outro utilizador). Devolve `{ uid: nome|null }`.
+ */
+export async function getFamilyMemberNames(familyId) {
+  const result = await getFamilyMemberNamesFn({ familyId });
+  return result.data.names;
 }

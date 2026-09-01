@@ -29,6 +29,7 @@ module.exports = {
   inviteFamilyMember: family.inviteFamilyMember,
   acceptFamilyInvite: family.acceptFamilyInvite,
   removeFamilyMember: family.removeFamilyMember,
+  getFamilyMemberNames: family.getFamilyMemberNames,
   // concessões de acesso
   createAccessGrant: access.createAccessGrant,
   acceptAccessGrant: access.acceptAccessGrant,
