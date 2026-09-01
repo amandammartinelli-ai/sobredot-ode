@@ -64,9 +64,11 @@
   --color-cat-observacoes: #6b6f76;
 
   /* --- Papéis de cor (semânticos, para uso em componentes) --- */
-  --color-bg: var(--color-neutral-50);
-  --color-surface: var(--color-neutral-0);
-  --color-surface-raised: var(--color-neutral-0);
+  /* Fundo e superfícies levemente quentes (em vez de branco/cinza puro),
+     para um ar mais acolhedor — ver pedido de revisão do visual geral. */
+  --color-bg: #f8f2e7;
+  --color-surface: #fffdf8;
+  --color-surface-raised: #fffdf8;
   --color-border: var(--color-neutral-200);
   --color-border-strong: var(--color-neutral-300);
   --color-text: var(--color-neutral-800);
@@ -111,7 +113,7 @@
   /* --- Raios --- */
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-lg: 20px;
   --radius-xl: 24px;
   --radius-full: 999px;
 
