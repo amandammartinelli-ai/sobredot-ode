@@ -53,6 +53,11 @@ const routes = {
     access: 'family',
     showChrome: true,
   },
+  falar: {
+    load: () => import('../views/speak/speakView.js').then((m) => m.renderSpeakView),
+    access: 'family',
+    showChrome: true,
+  },
   timeline: {
     load: () => import('../views/timeline/timelineView.js').then((m) => m.renderTimelineView),
     access: 'family',
