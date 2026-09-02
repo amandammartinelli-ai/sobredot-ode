@@ -6,6 +6,7 @@ import { getLatestRecordByCategory, listRecords } from '../../services/recordsSe
 import { createChildSelector } from '../../components/childSelector.js';
 import { createSummaryCard, createShortcutCard } from '../../components/card.js';
 import { createRegisterButton } from '../../components/registerButton.js';
+import { createSpeakButton } from '../../components/speakButton.js';
 import { createEmptyState } from '../../components/states/emptyState.js';
 import { recordCategories } from '../../data/mock/categories.js';
 
@@ -122,7 +123,10 @@ export async function renderDashboardView({ navigate }) {
 
     h('section', { 'aria-label': t('dashboard.subtitle'), class: 'dashboard-grid' }, cards),
 
-    h('div', { style: 'margin-block: var(--space-8)' }, [createRegisterButton()]),
+    h('div', { style: 'margin-block: var(--space-8); display:flex; flex-direction:column; gap:var(--space-3)' }, [
+      createRegisterButton(),
+      createSpeakButton(),
+    ]),
 
     h('section', { class: 'card', style: 'margin-bottom: var(--space-6)' }, [
       h('h2', { style: 'font-size:var(--font-size-lg)' }, [t('dashboard.statsTitle')]),
