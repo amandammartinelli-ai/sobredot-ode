@@ -337,6 +337,11 @@ export default {
     micNotFoundError: 'Não foi encontrado nenhum microfone neste dispositivo.',
     micNetworkError: 'O reconhecimento de voz precisa de ligação à internet — verifique a sua ligação e tente novamente.',
     micGenericError: 'Não foi possível usar o microfone. Tente novamente ou escreva diretamente aqui em baixo.',
+    micPrimerTitle: 'Precisamos da sua permissão',
+    micPrimerBody:
+      'Ao tocar em "Continuar", o navegador vai perguntar se pode usar o microfone. Toque em "Permitir" nessa pergunta para poder falar.',
+    micPrimerCta: 'Continuar e pedir permissão',
+    micPrimerCancel: 'Cancelar',
     emptyTranscriptError: 'Fale ou escreva alguma coisa antes de analisar.',
     analyzeCta: 'Concluir e analisar',
     recordAgainCta: 'Regravar',

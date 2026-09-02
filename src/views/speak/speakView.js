@@ -7,6 +7,9 @@ import { recordCategories, getCategoryById } from '../../data/mock/categories.js
 import { createEmptyState } from '../../components/states/emptyState.js';
 import { createErrorState } from '../../components/states/errorState.js';
 import { createSuccessState } from '../../components/states/successState.js';
+import { readJSON, writeJSON } from '../../services/storageService.js';
+
+const MIC_PRIMER_SEEN_KEY = 'speakMicPrimerSeen';
 
 const INTENSITY_OPTIONS = [
   { value: 'low', labelKey: 'register.form.intensityLow' },
@@ -100,6 +103,32 @@ export async function renderSpeakView() {
 
     if (!SpeechRecognitionCtor) return;
 
+    // Antes da primeira vez, explica o que vai acontecer em vez de pedir a
+    // permissão "a frio" — quem não entende a pergunta do navegador tende a
+    // tocar em "Bloquear" por desconfiança, e depois disso nenhum site
+    // consegue voltar a perguntar sozinho (é uma trava do próprio
+    // navegador). Prevenir esse toque acidental é mais valioso do que
+    // qualquer mensagem de erro depois do facto.
+    if (!readJSON(MIC_PRIMER_SEEN_KEY, false)) {
+      phase = 'priming';
+      renderIdle();
+      return;
+    }
+
+    startRecognition();
+  }
+
+  function confirmPrimerAndRecord() {
+    writeJSON(MIC_PRIMER_SEEN_KEY, true);
+    startRecognition();
+  }
+
+  function cancelPrimer() {
+    phase = 'idle';
+    renderIdle();
+  }
+
+  function startRecognition() {
     errorMessage = null;
     interimTranscript = '';
     manualStop = false;
@@ -148,7 +177,7 @@ export async function renderSpeakView() {
     try {
       recognition.start();
     } catch {
-      errorMessage = t('speak.micPermissionError');
+      errorMessage = t('speak.micGenericError');
       phase = 'idle';
     }
     renderIdle();
@@ -207,6 +236,33 @@ export async function renderSpeakView() {
   }
 
   function renderIdle() {
+    if (phase === 'priming') {
+      mount(container, [
+        h('header', { class: 'view__header' }, [
+          h('h1', {}, [t('speak.title')]),
+          h('p', { class: 'view__lead' }, [selectedChild.name]),
+        ]),
+        h('div', { class: 'card', style: 'text-align:center; max-width:420px; margin-inline:auto' }, [
+          h('span', { class: 'state-block__icon', 'aria-hidden': 'true' }, [t('speak.micIcon')]),
+          h('h3', {}, [t('speak.micPrimerTitle')]),
+          h('p', {}, [t('speak.micPrimerBody')]),
+          h(
+            'div',
+            { style: 'display:flex; gap:var(--space-3); justify-content:center; flex-wrap:wrap; margin-top:var(--space-4)' },
+            [
+              h('button', { type: 'button', class: 'btn btn--primary', onClick: confirmPrimerAndRecord }, [
+                t('speak.micPrimerCta'),
+              ]),
+              h('button', { type: 'button', class: 'btn btn--ghost', onClick: cancelPrimer }, [
+                t('speak.micPrimerCancel'),
+              ]),
+            ]
+          ),
+        ]),
+      ]);
+      return;
+    }
+
     const transcriptText = getDisplayTranscript();
 
     const micButton = SpeechRecognitionCtor
