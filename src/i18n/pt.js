@@ -332,7 +332,11 @@ export default {
     notSupportedTitle: 'Reconhecimento de voz não disponível',
     notSupportedBody: 'Este navegador não suporta ditado por voz. Pode escrever diretamente aqui em baixo.',
     fallbackTextareaLabel: 'Escreva o que aconteceu',
-    micPermissionError: 'Não foi possível aceder ao microfone. Verifique as permissões do navegador.',
+    micPermissionError:
+      'O navegador bloqueou o acesso ao microfone. Toque no ícone de cadeado junto ao endereço do site, mude "Microfone" para Permitir e recarregue a página.',
+    micNotFoundError: 'Não foi encontrado nenhum microfone neste dispositivo.',
+    micNetworkError: 'O reconhecimento de voz precisa de ligação à internet — verifique a sua ligação e tente novamente.',
+    micGenericError: 'Não foi possível usar o microfone. Tente novamente ou escreva diretamente aqui em baixo.',
     emptyTranscriptError: 'Fale ou escreva alguma coisa antes de analisar.',
     analyzeCta: 'Concluir e analisar',
     recordAgainCta: 'Regravar',
