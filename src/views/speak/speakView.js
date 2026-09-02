@@ -18,6 +18,26 @@ function getSpeechRecognitionCtor() {
   return window.SpeechRecognition || window.webkitSpeechRecognition || null;
 }
 
+/**
+ * Traduz o código de erro do SpeechRecognition (ver
+ * https://developer.mozilla.org/docs/Web/API/SpeechRecognitionErrorEvent/error)
+ * numa mensagem que diga o que fazer a seguir — "não foi possível aceder"
+ * sozinho não distinguia permissão bloqueada de falta de microfone ou de
+ * falha de rede, o que tornava impossível diagnosticar à distância.
+ */
+function describeSpeechRecognitionError(errorCode) {
+  if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
+    return t('speak.micPermissionError');
+  }
+  if (errorCode === 'audio-capture') {
+    return t('speak.micNotFoundError');
+  }
+  if (errorCode === 'network') {
+    return t('speak.micNetworkError');
+  }
+  return t('speak.micGenericError');
+}
+
 export async function renderSpeakView() {
   const { familyId, selectedChild } = await loadChildContext();
   const container = h('div', { class: 'container view' });
@@ -105,7 +125,7 @@ export async function renderSpeakView() {
 
     recognition.onerror = (event) => {
       if (event.error === 'no-speech') return;
-      errorMessage = t('speak.micPermissionError');
+      errorMessage = describeSpeechRecognitionError(event.error);
       manualStop = true;
       phase = 'idle';
       renderIdle();
@@ -210,7 +230,11 @@ export async function renderSpeakView() {
         ])
       : null;
 
-    const fallbackTextarea = !SpeechRecognitionCtor
+    // Mostra a alternativa de escrever sempre que a voz não é uma opção
+    // fiável agora — sem suporte no navegador, ou depois de um erro (ex.:
+    // permissão de microfone bloqueada) — nunca deixa a pessoa "presa" só
+    // com um botão de microfone que não funciona.
+    const fallbackTextarea = !SpeechRecognitionCtor || errorMessage
       ? h('div', { class: 'form-field' }, [
           h('label', { for: 'speak-fallback-text' }, [t('speak.fallbackTextareaLabel')]),
           h(
