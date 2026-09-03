@@ -7,9 +7,6 @@ import { recordCategories, getCategoryById } from '../../data/mock/categories.js
 import { createEmptyState } from '../../components/states/emptyState.js';
 import { createErrorState } from '../../components/states/errorState.js';
 import { createSuccessState } from '../../components/states/successState.js';
-import { readJSON, writeJSON } from '../../services/storageService.js';
-
-const MIC_PRIMER_SEEN_KEY = 'speakMicPrimerSeen';
 
 const INTENSITY_OPTIONS = [
   { value: 'low', labelKey: 'register.form.intensityLow' },
@@ -17,30 +14,15 @@ const INTENSITY_OPTIONS = [
   { value: 'high', labelKey: 'register.form.intensityHigh' },
 ];
 
-function getSpeechRecognitionCtor() {
-  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
-}
-
 /**
- * Traduz o código de erro do SpeechRecognition (ver
- * https://developer.mozilla.org/docs/Web/API/SpeechRecognitionErrorEvent/error)
- * numa mensagem que diga o que fazer a seguir — "não foi possível aceder"
- * sozinho não distinguia permissão bloqueada de falta de microfone ou de
- * falha de rede, o que tornava impossível diagnosticar à distância.
+ * Em vez de um `SpeechRecognition` próprio da página (que se mostrou, na
+ * prática, dependente de configurações de permissão que variam por
+ * navegador e por fabricante — Chrome, Samsung Internet, Safari — e que
+ * ninguém deveria ter de ir configurar para poder falar), a "voz" aqui é
+ * o botão de microfone que já existe em qualquer teclado de telemóvel
+ * (o mesmo do WhatsApp). É um campo de texto normal — sem pedir nenhuma
+ * permissão nova, sem nada para configurar.
  */
-function describeSpeechRecognitionError(errorCode) {
-  if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed') {
-    return t('speak.micPermissionError');
-  }
-  if (errorCode === 'audio-capture') {
-    return t('speak.micNotFoundError');
-  }
-  if (errorCode === 'network') {
-    return t('speak.micNetworkError');
-  }
-  return t('speak.micGenericError');
-}
-
 export async function renderSpeakView() {
   const { familyId, selectedChild } = await loadChildContext();
   const container = h('div', { class: 'container view' });
@@ -52,161 +34,27 @@ export async function renderSpeakView() {
     return container;
   }
 
-  const SpeechRecognitionCtor = getSpeechRecognitionCtor();
-
-  let phase = 'idle'; // 'idle' | 'recording' | 'reviewing'
-  let finalTranscript = '';
-  let interimTranscript = '';
-  let recognition = null;
-  let manualStop = false;
+  let transcript = '';
   let errorMessage = null;
   let occurredAt = new Date().toISOString().slice(0, 16);
   let drafts = [];
-  let transcriptNode = null;
-
-  // Não há gancho de "saída da vista" neste router (ver src/router/router.js)
-  // — sem isto, mudar de rota a meio de uma gravação deixava o microfone a
-  // ouvir indefinidamente.
-  window.addEventListener(
-    'hashchange',
-    () => {
-      if (recognition && phase === 'recording') {
-        manualStop = true;
-        try {
-          recognition.stop();
-        } catch {
-          // já parado — nada a fazer.
-        }
-      }
-    },
-    { once: true }
-  );
-
-  function getDisplayTranscript() {
-    return `${finalTranscript}${interimTranscript}`.replace(/\s+/g, ' ').trim();
-  }
-
-  function updateTranscriptDisplay() {
-    if (transcriptNode) {
-      transcriptNode.textContent = getDisplayTranscript() || t('speak.transcriptEmptyHint');
-    }
-  }
-
-  function toggleRecording() {
-    if (phase === 'recording') {
-      manualStop = true;
-      if (recognition) recognition.stop();
-      phase = 'idle';
-      renderIdle();
-      return;
-    }
-
-    if (!SpeechRecognitionCtor) return;
-
-    // Antes da primeira vez, explica o que vai acontecer em vez de pedir a
-    // permissão "a frio" — quem não entende a pergunta do navegador tende a
-    // tocar em "Bloquear" por desconfiança, e depois disso nenhum site
-    // consegue voltar a perguntar sozinho (é uma trava do próprio
-    // navegador). Prevenir esse toque acidental é mais valioso do que
-    // qualquer mensagem de erro depois do facto.
-    if (!readJSON(MIC_PRIMER_SEEN_KEY, false)) {
-      phase = 'priming';
-      renderIdle();
-      return;
-    }
-
-    startRecognition();
-  }
-
-  function confirmPrimerAndRecord() {
-    writeJSON(MIC_PRIMER_SEEN_KEY, true);
-    startRecognition();
-  }
-
-  function cancelPrimer() {
-    phase = 'idle';
-    renderIdle();
-  }
-
-  function startRecognition() {
-    errorMessage = null;
-    interimTranscript = '';
-    manualStop = false;
-
-    recognition = new SpeechRecognitionCtor();
-    recognition.lang = 'pt-PT';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
-    recognition.onresult = (event) => {
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript += `${result[0].transcript} `;
-        } else {
-          interim += result[0].transcript;
-        }
-      }
-      interimTranscript = interim;
-      updateTranscriptDisplay();
-    };
-
-    recognition.onerror = (event) => {
-      if (event.error === 'no-speech') return;
-      errorMessage = describeSpeechRecognitionError(event.error);
-      manualStop = true;
-      phase = 'idle';
-      renderIdle();
-    };
-
-    recognition.onend = () => {
-      // Alguns navegadores param sozinhos ao fim de uma pausa no discurso
-      // mesmo com `continuous: true` — se não foi um "toque para parar"
-      // deliberado, recomeça para não cortar a fala a meio.
-      if (!manualStop && phase === 'recording') {
-        try {
-          recognition.start();
-        } catch {
-          // já a correr — ignora.
-        }
-      }
-    };
-
-    phase = 'recording';
-    try {
-      recognition.start();
-    } catch {
-      errorMessage = t('speak.micGenericError');
-      phase = 'idle';
-    }
-    renderIdle();
-  }
 
   function handleAnalyze() {
-    if (recognition && phase === 'recording') {
-      manualStop = true;
-      recognition.stop();
-    }
-    const transcript = getDisplayTranscript();
-    if (!transcript) {
+    const text = transcript.trim();
+    if (!text) {
       errorMessage = t('speak.emptyTranscriptError');
-      phase = 'idle';
       renderIdle();
       return;
     }
-    drafts = extractRecordDraftsFromTranscript(transcript).map((draft) => ({ ...draft, status: 'pending' }));
-    phase = 'reviewing';
+    drafts = extractRecordDraftsFromTranscript(text).map((draft) => ({ ...draft, status: 'pending' }));
     announce(t('speak.reviewTitle'));
     renderReview();
   }
 
   function startOver() {
-    finalTranscript = '';
-    interimTranscript = '';
+    transcript = '';
     drafts = [];
     errorMessage = null;
-    phase = 'idle';
     renderIdle();
   }
 
@@ -236,78 +84,6 @@ export async function renderSpeakView() {
   }
 
   function renderIdle() {
-    if (phase === 'priming') {
-      mount(container, [
-        h('header', { class: 'view__header' }, [
-          h('h1', {}, [t('speak.title')]),
-          h('p', { class: 'view__lead' }, [selectedChild.name]),
-        ]),
-        h('div', { class: 'card', style: 'text-align:center; max-width:420px; margin-inline:auto' }, [
-          h('span', { class: 'state-block__icon', 'aria-hidden': 'true' }, [t('speak.micIcon')]),
-          h('h3', {}, [t('speak.micPrimerTitle')]),
-          h('p', {}, [t('speak.micPrimerBody')]),
-          h(
-            'div',
-            { style: 'display:flex; gap:var(--space-3); justify-content:center; flex-wrap:wrap; margin-top:var(--space-4)' },
-            [
-              h('button', { type: 'button', class: 'btn btn--primary', onClick: confirmPrimerAndRecord }, [
-                t('speak.micPrimerCta'),
-              ]),
-              h('button', { type: 'button', class: 'btn btn--ghost', onClick: cancelPrimer }, [
-                t('speak.micPrimerCancel'),
-              ]),
-            ]
-          ),
-        ]),
-      ]);
-      return;
-    }
-
-    const transcriptText = getDisplayTranscript();
-
-    const micButton = SpeechRecognitionCtor
-      ? h(
-          'button',
-          {
-            type: 'button',
-            class: phase === 'recording' ? 'mic-button mic-button--recording' : 'mic-button',
-            onClick: toggleRecording,
-          },
-          [
-            h('span', { class: 'mic-button__icon', 'aria-hidden': 'true' }, [t('speak.micIcon')]),
-            phase === 'recording' ? t('speak.micRecordingLabel') : t('speak.micIdleLabel'),
-          ]
-        )
-      : '';
-
-    transcriptNode = SpeechRecognitionCtor
-      ? h('p', { class: 'card', style: 'min-height:4rem; white-space:pre-wrap' }, [
-          transcriptText || t('speak.transcriptEmptyHint'),
-        ])
-      : null;
-
-    // Mostra a alternativa de escrever sempre que a voz não é uma opção
-    // fiável agora — sem suporte no navegador, ou depois de um erro (ex.:
-    // permissão de microfone bloqueada) — nunca deixa a pessoa "presa" só
-    // com um botão de microfone que não funciona.
-    const fallbackTextarea = !SpeechRecognitionCtor || errorMessage
-      ? h('div', { class: 'form-field' }, [
-          h('label', { for: 'speak-fallback-text' }, [t('speak.fallbackTextareaLabel')]),
-          h(
-            'textarea',
-            {
-              class: 'textarea',
-              id: 'speak-fallback-text',
-              rows: 6,
-              onInput: (e) => {
-                finalTranscript = e.target.value;
-              },
-            },
-            [finalTranscript]
-          ),
-        ])
-      : '';
-
     mount(container, [
       h('header', { class: 'view__header' }, [
         h('h1', {}, [t('speak.title')]),
@@ -315,14 +91,24 @@ export async function renderSpeakView() {
         h('p', { class: 'view__lead' }, [selectedChild.name]),
       ]),
 
-      !SpeechRecognitionCtor
-        ? createErrorState({ title: t('speak.notSupportedTitle'), body: t('speak.notSupportedBody') })
-        : '',
       errorMessage ? createErrorState({ body: errorMessage }) : '',
 
-      micButton ? h('div', { style: 'margin: var(--space-6) 0' }, [micButton]) : '',
-      transcriptNode || '',
-      fallbackTextarea,
+      h('div', { class: 'form-field' }, [
+        h('label', { for: 'speak-text' }, [t('speak.fallbackTextareaLabel')]),
+        h('p', { class: 'form-field__hint' }, [t('speak.micHint')]),
+        h(
+          'textarea',
+          {
+            class: 'textarea',
+            id: 'speak-text',
+            rows: 8,
+            onInput: (e) => {
+              transcript = e.target.value;
+            },
+          },
+          [transcript]
+        ),
+      ]),
 
       h('div', { style: 'display:flex; gap:var(--space-3); flex-wrap:wrap; margin-top: var(--space-4)' }, [
         h('button', { type: 'button', class: 'btn btn--primary', onClick: handleAnalyze }, [t('speak.analyzeCta')]),
