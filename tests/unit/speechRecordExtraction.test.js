@@ -34,6 +34,23 @@ describe('extractRecordDraftsFromTranscript', () => {
     expect(extractRecordDraftsFromTranscript('chorou')[0].intensity).toBe('medium');
   });
 
+  it('splits a punctuation-free, connector-free run-on sentence at each new topic (reported live: "Hoje meu filho acordou bem disposto comeu pouco e brincou bastante")', () => {
+    const drafts = extractRecordDraftsFromTranscript(
+      'Hoje meu filho acordou bem disposto comeu pouco e brincou bastante'
+    );
+    expect(drafts).toHaveLength(2);
+    expect(drafts[0].categoryId).toBe('sleep');
+    expect(drafts[0].notes).toBe('Hoje meu filho acordou bem disposto');
+    expect(drafts[1].categoryId).toBe('food');
+    expect(drafts[1].notes).toBe('comeu pouco e brincou bastante');
+  });
+
+  it('does not split when the same category is mentioned more than once in a row', () => {
+    const drafts = extractRecordDraftsFromTranscript('dormiu muito mal e acordou de madrugada outra vez');
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].categoryId).toBe('sleep');
+  });
+
   it('recognizes keywords across all ten record categories', () => {
     const bySentence = {
       'chorou muito de manhã': 'emotions',
