@@ -121,14 +121,14 @@ export async function renderDashboardView({ navigate }) {
       ]
     ),
 
-    h('section', { 'aria-label': t('dashboard.subtitle'), class: 'dashboard-grid' }, cards),
-
-    h('div', { style: 'margin-block: var(--space-8); display:flex; flex-direction:column; gap:var(--space-3)' }, [
+    h('div', { style: 'margin-block: var(--space-6); display:flex; flex-direction:column; gap:var(--space-3)' }, [
       createRegisterButton(),
       createSpeakButton(),
     ]),
 
-    h('section', { class: 'card', style: 'margin-bottom: var(--space-6)' }, [
+    h('section', { 'aria-label': t('dashboard.subtitle'), class: 'dashboard-grid' }, cards),
+
+    h('section', { class: 'card', style: 'margin-block: var(--space-6)' }, [
       h('h2', { style: 'font-size:var(--font-size-lg)' }, [t('dashboard.statsTitle')]),
       statsSection,
     ]),
