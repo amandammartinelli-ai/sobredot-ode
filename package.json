@@ -26,6 +26,6 @@
     "vitest": "^1.6.0"
   },
   "dependencies": {
-    "firebase": "^12.18.0"
+    "firebase": "^12.19.0"
   }
 }
